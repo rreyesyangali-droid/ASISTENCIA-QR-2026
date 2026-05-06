@@ -895,6 +895,9 @@ document.addEventListener('fbready', async () => {
 
   // Mostrar login
   document.getElementById('splashScreen').style.display = 'none';
+  // Actualizar estado Firebase
+  const fbDot = document.getElementById('fbStatus');
+  if(fbDot) fbDot.innerHTML = '<div class="fb-dot" style="background:#2ecc71"></div> Firebase Online';
   document.getElementById('loginScreen').style.display = 'flex';
 
   // Ahora sí escuchar cambios de auth
@@ -1232,17 +1235,25 @@ async function agregarEstudiante() {
   if (!nombre || !dniPadre) { notif('❌ Nombre y DNI son obligatorios','error'); return; }
   if (!/^\d{8}$/.test(dniPadre)) { notif('❌ DNI debe tener 8 dígitos','error'); return; }
   
+  const btnAgregar=document.querySelector('#panel_admin .btn[onclick="agregarEstudiante()"]');
+  if(btnAgregar){btnAgregar.disabled=true;btnAgregar.textContent='⏳ Guardando...';}
   try {
-    await fsAdd('estudiantes',{ nombre, grado, seccion, dniPadre, telefono });
-    notif('✅ Estudiante registrado en Firebase','success');
+    await fsAdd('estudiantes',{ nombre, grado, seccion, dniPadre, telefono, creadoEn: FB.serverTimestamp() });
+    notif('✅ Estudiante registrado correctamente','success');
     document.getElementById('sNombre').value='';
     document.getElementById('sDNI').value='';
     document.getElementById('sTelefono').value='';
     renderEstudiantes();
     actualizarStats();
   } catch(e) {
-    notif('❌ Error al guardar: '+e.message,'error');
+    console.error('Error guardar estudiante:', e);
+    if(e.code==='permission-denied'){
+      notif('❌ Sin permisos — verifica las reglas de Firestore','error');
+    } else {
+      notif('❌ Error al guardar: '+e.message,'error');
+    }
   }
+  if(btnAgregar){btnAgregar.disabled=false;btnAgregar.textContent='➕ Agregar Estudiante';}
 }
 
 async function renderEstudiantes() {
@@ -1275,13 +1286,19 @@ async function renderEstudiantes() {
         <button class="btn btn-danger btn-sm" onclick="eliminarEstudiante('${e.id}')">🗑</button>
       </div>
     </div>`).join('');
-  lista.forEach(e => generarQR(e.id, e));
+  // Generar QRs con delay escalonado para asegurar que el DOM está listo
+  lista.forEach((e, i) => setTimeout(() => generarQR(e.id, e), 200 + i * 50));
 }
 
 function generarQR(id, estudiante) {
-  const el = document.getElementById('qr_'+id);
-  if (!el || el.querySelector('canvas')) return;
-  new QRCode(el, { text: JSON.stringify({id, nombre:estudiante.nombre, grado:estudiante.grado, seccion:estudiante.seccion}), width:76, height:76, correctLevel:QRCode.CorrectLevel.M });
+  setTimeout(() => {
+    const el = document.getElementById('qr_'+id);
+    if (!el) return;
+    el.innerHTML = '';
+    try {
+      new QRCode(el, { text: JSON.stringify({id, nombre:estudiante.nombre, grado:estudiante.grado, seccion:estudiante.seccion}), width:76, height:76, correctLevel:QRCode.CorrectLevel.M });
+    } catch(e) { console.warn('QR error:', e); }
+  }, 100);
 }
 
 async function eliminarEstudiante(id) {
@@ -1487,19 +1504,30 @@ async function buscarPorDNI() {
 async function consultarPadre() {
   const dni=document.getElementById('padreInputDNI').value.trim();
   if(!/^\d{8}$/.test(dni)){notif('❌ DNI debe tener 8 dígitos','error');return;}
+  const btn=document.querySelector('#padreLoginDiv .btn-primary');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Buscando...';}
   try {
-    if (!FB.auth.currentUser) { await FB.signInAnonymously(FB.auth); }
+    // Autenticar anónimamente si no hay sesión
+    if (!FB.auth.currentUser) {
+      await FB.signInAnonymously(FB.auth);
+      // Esperar un momento para que la auth se estabilice
+      await new Promise(r=>setTimeout(r,800));
+    }
     const todos=await fsGetAll('estudiantes');
     const hijos=todos.filter(e=>{
       const d=(e.dniPadre||e.dni||e.dniApoderado||'').toString().trim();
       return d===dni;
     });
-    if(!hijos.length){notif('❌ No se encontraron estudiantes con ese DNI','error');return;}
-  document.getElementById('padreLoginDiv').style.display='none';
-  document.getElementById('padreInfoDiv').classList.remove('hide');
-  document.getElementById('padreApodInfo').innerHTML=`<strong>👪 Apoderado: DNI ${dni}</strong> — ${hijos.length} hijo(s) registrado(s)`;
-  await renderHijosInfo(hijos);
-  } catch(e) { notif('❌ Error de conexión: '+e.message,'error'); }
+    if(!hijos.length){notif('❌ No se encontraron estudiantes con ese DNI. Consulta al administrador.','error');if(btn){btn.disabled=false;btn.textContent='Consultar';}return;}
+    document.getElementById('padreLoginDiv').style.display='none';
+    document.getElementById('padreInfoDiv').classList.remove('hide');
+    document.getElementById('padreApodInfo').innerHTML=`<strong>👪 Apoderado: DNI ${dni}</strong> — ${hijos.length} hijo(s) registrado(s)`;
+    await renderHijosInfo(hijos);
+  } catch(e) { 
+    console.error('Error padre:', e);
+    notif('❌ Error de conexión: '+e.message,'error'); 
+    if(btn){btn.disabled=false;btn.textContent='Consultar';}
+  }
 }
 
 async function renderHijosInfo(hijos) {
