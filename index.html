@@ -1533,12 +1533,11 @@ async function renderListaAsistencia() {
     const pres=presSet.has(e.id), just=justifSet.has(e.id);
     const cls=pres?'presente':just?'justificado':'ausente';
     const badge=pres?'<span class="badge badge-green">✅ Presente</span>':just?'<span class="badge badge-blue">📄 Justificado</span>':'<span class="badge badge-red">❌ Ausente</span>';
-    const qrStr = JSON.stringify({id:e.id,nombre:e.nombre,grado:e.grado,seccion:e.seccion}).replace(/'/g,"\\'");
     return `<div class="student-card ${cls}">
       <div class="student-name">${e.nombre}</div>
       <div class="student-grade">${e.grado} — Sección ${e.seccion}</div>
       ${badge}
-      ${!pres?`<br><button class="btn btn-success btn-sm" style="margin-top:6px;" onclick="registrarAsistencia('${qrStr}')">✅ Registrar</button>`:''}
+      ${!pres?`<br><button class="btn btn-success btn-sm" style="margin-top:6px;" data-id="${e.id}" onclick="regManual(this)">✅ Registrar</button>`:''}
     </div>`;
   }).join('');
 }
@@ -1564,10 +1563,9 @@ async function buscarPorNombre() {
   const presSet=new Set(asist.map(a=>a.estudianteId));
   c.innerHTML=lista.slice(0,8).map(e=>{
     const pres=presSet.has(e.id);
-    const qrStr=JSON.stringify({id:e.id,nombre:e.nombre,grado:e.grado,seccion:e.seccion}).replace(/'/g,"\\'");
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:8px;margin-bottom:5px;background:${pres?'#fdf0ef':'var(--gris-bg)'};border:1px solid ${pres?'#a9dfbf':'var(--borde)'};">
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:8px;margin-bottom:5px;background:${pres?'#e8f8ef':'var(--gris-bg)'};border:1px solid ${pres?'#a9dfbf':'var(--borde)'};">
       <div><div style="font-size:12px;font-weight:700;">${e.nombre}</div><div style="font-size:10px;color:var(--texto-suave);">${e.grado} — Sección ${e.seccion}</div></div>
-      ${pres?'<span class="badge badge-green">✅</span>':`<button class="btn btn-success btn-sm" onclick="registrarAsistencia('${qrStr}')">Registrar</button>`}
+      ${pres?'<span class="badge badge-green">✅ Presente</span>':`<button class="btn btn-success btn-sm" data-id="${e.id}" onclick="regManual(this)">Registrar</button>`}
     </div>`;
   }).join('')||'<div style="padding:8px;font-size:12px;color:var(--texto-suave);">Sin resultados</div>';
 }
@@ -1587,10 +1585,9 @@ async function buscarPorDNI() {
   const presSet=new Set(asist.map(a=>a.estudianteId));
   c.innerHTML=hijos.map(e=>{
     const pres=presSet.has(e.id);
-    const qrStr=JSON.stringify({id:e.id,nombre:e.nombre,grado:e.grado,seccion:e.seccion}).replace(/'/g,"\\'");
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 11px;border-radius:9px;margin-bottom:6px;background:${pres?'#fdf0ef':'var(--gris-bg)'};border:1.5px solid ${pres?'#a9dfbf':'var(--borde)'};">
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 11px;border-radius:9px;margin-bottom:6px;background:${pres?'#e8f8ef':'var(--gris-bg)'};border:1.5px solid ${pres?'#a9dfbf':'var(--borde)'};">
       <div><div style="font-size:13px;font-weight:700;">${e.nombre}</div><div style="font-size:11px;color:var(--texto-suave);">${e.grado} — Sección ${e.seccion}</div></div>
-      ${pres?'<span class="badge badge-green">✅ Presente</span>':`<button class="btn btn-success btn-sm" onclick="registrarAsistencia('${qrStr}')">Registrar</button>`}
+      ${pres?'<span class="badge badge-green">✅ Presente</span>':`<button class="btn btn-success btn-sm" data-id="${e.id}" onclick="regManual(this)">Registrar</button>`}
     </div>`;
   }).join('');
 }
