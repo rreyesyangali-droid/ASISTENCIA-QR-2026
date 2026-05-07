@@ -153,6 +153,7 @@ function instalarApp() {
 </script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
 <!-- ══ FIREBASE ══ -->
@@ -1279,7 +1280,7 @@ async function renderEstudiantes() {
     <div class="student-card ${presSet.has(e.id)?'presente':''}">
       <div class="student-name">${e.nombre}</div>
       <div class="student-grade">${e.grado} — Sección ${e.seccion}</div>
-      <div class="qr-container" id="qr_${e.id}"></div>
+      <div class="qr-container" id="qr_${e.id}" style="min-height:76px;display:flex;align-items:center;justify-content:center;"></div>
       <small style="color:var(--texto-suave);font-size:10px;">DNI apod: ${e.dniPadre}</small>
       <div style="margin-top:7px;display:flex;gap:4px;justify-content:center;flex-wrap:wrap;">
         <button class="btn btn-sm" style="background:#c0392b;color:white;" onclick="descargarQR('${e.id}')">📥 QR</button>
@@ -1287,7 +1288,7 @@ async function renderEstudiantes() {
       </div>
     </div>`).join('');
   // Generar QRs con delay escalonado para asegurar que el DOM está listo
-  lista.forEach((e, i) => setTimeout(() => generarQR(e.id, e), 200 + i * 50));
+  lista.forEach((e, i) => setTimeout(() => generarQR(e.id, e), 400 + i * 80));
 }
 
 function generarQR(id, estudiante) {
@@ -1295,10 +1296,27 @@ function generarQR(id, estudiante) {
     const el = document.getElementById('qr_'+id);
     if (!el) return;
     el.innerHTML = '';
+    const texto = JSON.stringify({id, nombre:estudiante.nombre, grado:estudiante.grado, seccion:estudiante.seccion});
     try {
-      new QRCode(el, { text: JSON.stringify({id, nombre:estudiante.nombre, grado:estudiante.grado, seccion:estudiante.seccion}), width:76, height:76, correctLevel:QRCode.CorrectLevel.M });
-    } catch(e) { console.warn('QR error:', e); }
-  }, 100);
+      // Método 1: QRCode.js
+      new QRCode(el, { text: texto, width:76, height:76, correctLevel:QRCode.CorrectLevel.M });
+    } catch(e1) {
+      try {
+        // Método 2: qrcode-generator
+        const qr = qrcode(0, 'M');
+        qr.addData(texto);
+        qr.make();
+        el.innerHTML = qr.createImgTag(2, 4);
+      } catch(e2) {
+        // Método 3: API externa como fallback
+        const img = document.createElement('img');
+        img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=76x76&data=' + encodeURIComponent(texto);
+        img.width = 76; img.height = 76;
+        img.style.borderRadius = '4px';
+        el.appendChild(img);
+      }
+    }
+  }, 300);
 }
 
 async function eliminarEstudiante(id) {
