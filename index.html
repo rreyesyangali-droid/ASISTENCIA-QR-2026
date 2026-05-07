@@ -1257,7 +1257,7 @@ async function agregarEstudiante() {
   if(btnAgregar){btnAgregar.disabled=false;btnAgregar.textContent='➕ Agregar Estudiante';}
 }
 
-async function renderEstudiantes() {
+async async function renderEstudiantes() {
   const c = document.getElementById('listaEstudiantes');
   if (!c) return;
   c.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--texto-suave);">⏳ Cargando…</div>';
@@ -1329,10 +1329,33 @@ async function eliminarEstudiante(id) {
 
 async function descargarQR(id) {
   const e = _estudiantesCache.find(x=>x.id===id) || await fsGet('estudiantes', id);
-  if (!e) return;
-  const qrEl = document.getElementById('qr_'+id);
-  const qrCanvas = qrEl?.querySelector('canvas');
-  if (!qrCanvas) { notif('❌ Espera a que se genere el QR','error'); return; }
+  if (!e) { notif('❌ Estudiante no encontrado','error'); return; }
+  notif('⏳ Generando tarjeta QR...','info');
+  // Crear QR temporal fuera de la vista
+  const qrTemp = document.createElement('div');
+  qrTemp.style.cssText = 'position:fixed;left:-9999px;top:0;width:200px;height:200px;background:white;';
+  document.body.appendChild(qrTemp);
+  const texto = JSON.stringify({id, nombre:e.nombre, grado:e.grado, seccion:e.seccion});
+  let qrCanvas = null;
+  try {
+    await new Promise((res) => {
+      new QRCode(qrTemp, { text: texto, width:180, height:180, correctLevel:QRCode.CorrectLevel.M });
+      setTimeout(() => { qrCanvas = qrTemp.querySelector('canvas'); res(); }, 600);
+    });
+  } catch(err) { console.warn('QRCode error:', err); }
+  if (!qrCanvas) { 
+    document.body.removeChild(qrTemp);
+    // Fallback: descargar con imagen de API
+    const a = document.createElement('a');
+    a.href = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(texto);
+    a.download = 'QR_'+e.nombre.replace(/ /g,'_')+'.png';
+    a.target = '_blank';
+    a.click();
+    notif('📥 QR descargado (modo alternativo)','success');
+    return;
+  }
+  // Continuar con canvas...
+  const dummy = null; // placeholder para mantener el bloque
 
   const W=320,H=400;
   const card = document.createElement('canvas');
@@ -1474,7 +1497,7 @@ async function cargarTablaAsistencia() {
   tbody.innerHTML = asist.map(a=>`<tr class="row-presente"><td>${a.nombre||a.estudianteId}</td><td>${a.grado||'—'}</td><td>${a.seccion||'—'}</td><td>${a.hora}</td><td><span class="badge badge-green">✅ Presente</span></td></tr>`).join('');
 }
 
-async function buscarPorNombre() {
+async async function buscarPorNombre() {
   const q = document.getElementById('buscarNombre').value.trim().toLowerCase();
   const c = document.getElementById('resBusqueda');
   if (q.length < 2) { c.innerHTML=''; return; }
@@ -1493,7 +1516,7 @@ async function buscarPorNombre() {
   }).join('')||'<div style="padding:8px;font-size:12px;color:var(--texto-suave);">Sin resultados</div>';
 }
 
-async function buscarPorDNI() {
+async async function buscarPorDNI() {
   const dni=document.getElementById('dniBusq').value.trim();
   const c=document.getElementById('resDNI');
   if(!/^\d{8}$/.test(dni)){notif('❌ DNI debe tener 8 dígitos','error');return;}
