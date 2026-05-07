@@ -1227,6 +1227,48 @@ function actualizarTimer() {
 // ══════════════════════════════════════════════════════
 // ESTUDIANTES
 // ══════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════
+// EDITAR ESTUDIANTE
+// ══════════════════════════════════════════════════════
+async function editarEstudiante(id) {
+  const e = _estudiantesCache.find(x=>x.id===id) || await fsGet('estudiantes', id);
+  if (!e) { notif('❌ Estudiante no encontrado','error'); return; }
+  document.getElementById('editEstId').value = id;
+  document.getElementById('editEstNombre').value = e.nombre || '';
+  document.getElementById('editEstGrado').value = e.grado || '1°';
+  document.getElementById('editEstSeccion').value = e.seccion || 'A';
+  document.getElementById('editEstDNI').value = e.dniPadre || '';
+  document.getElementById('editEstTelefono').value = e.telefono || '';
+  document.getElementById('modalEditarEst').classList.add('open');
+}
+
+async function guardarEdicionEstudiante() {
+  const id = document.getElementById('editEstId').value;
+  const nombre = document.getElementById('editEstNombre').value.trim();
+  const grado = document.getElementById('editEstGrado').value;
+  const seccion = document.getElementById('editEstSeccion').value;
+  const dniPadre = document.getElementById('editEstDNI').value.trim();
+  const telefono = document.getElementById('editEstTelefono').value.trim();
+
+  if (!nombre) { notif('❌ El nombre es obligatorio','error'); return; }
+  if (!/^\d{8}$/.test(dniPadre)) { notif('❌ DNI debe tener 8 dígitos','error'); return; }
+
+  const btn = document.querySelector('#modalEditarEst .btn-primary');
+  if (btn) { btn.disabled=true; btn.textContent='⏳ Guardando...'; }
+  try {
+    await FB.updateDoc(FB.doc(FB.db, 'estudiantes', id), { nombre, grado, seccion, dniPadre, telefono });
+    notif('✅ Estudiante actualizado correctamente','success');
+    document.getElementById('modalEditarEst').classList.remove('open');
+    renderEstudiantes();
+    actualizarStats();
+  } catch(err) {
+    console.error('Error editar:', err);
+    notif('❌ Error al guardar: '+err.message,'error');
+  }
+  if (btn) { btn.disabled=false; btn.textContent='💾 Guardar cambios'; }
+}
+
 async function agregarEstudiante() {
   const nombre = document.getElementById('sNombre').value.trim();
   const grado = document.getElementById('sGrado').value;
@@ -1284,6 +1326,7 @@ async function renderEstudiantes() {
       <small style="color:var(--texto-suave);font-size:10px;">DNI apod: ${e.dniPadre}</small>
       <div style="margin-top:7px;display:flex;gap:4px;justify-content:center;flex-wrap:wrap;">
         <button class="btn btn-sm" style="background:#c0392b;color:white;" onclick="descargarQR('${e.id}')">📥 QR</button>
+        <button class="btn btn-sm" style="background:#2980b9;color:white;" onclick="editarEstudiante('${e.id}')">✏️</button>
         <button class="btn btn-danger btn-sm" onclick="eliminarEstudiante('${e.id}')">🗑</button>
       </div>
     </div>`).join('');
@@ -1433,7 +1476,51 @@ async function imprimirQR() {
       <div class="ftr">IE N.° 0162 — Solo uso interno</div>
     </div>`;
   }).join('');
-  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Tarjetas QR — IE 0162</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;background:white;padding:10px;}.grid{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-start;}.tarjeta{width:200px;border-radius:12px;overflow:hidden;border:1.5px solid #d4ddd6;background:white;page-break-inside:avoid;}.hdr{background:#0f3d22;color:white;padding:10px;text-align:center;border-bottom:4px solid #2ecc71;}.colegio{font-size:8px;font-weight:bold;line-height:1.5;}.sub{font-size:7.5px;opacity:.65;margin-top:2px;}.qr-wrap{padding:10px;text-align:center;background:#f8f9f8;border-bottom:1px solid #e8ece8;}.sep{height:1px;background:#e0e6e1;margin:0 10px;}.id-txt{font-size:9px;color:#9aaa9d;text-align:center;padding:5px 0 2px;font-family:monospace;font-weight:bold;}.nombre{font-size:13px;font-weight:bold;text-align:center;padding:2px 8px 2px;color:#1c2b1e;}.grado{font-size:10px;font-weight:bold;color:#1a6b3a;text-align:center;padding:2px 0 8px;}.ftr{background:#0f3d22;color:rgba(255,255,255,.45);font-size:7px;text-align:center;padding:5px;}@media print{body{padding:4px;}.grid{gap:6px;}}</style></head><body><div class="grid">${rows}</div><script>window.onload=()=>setTimeout(()=>window.print(),1200);<\/script></body></html>`;
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Tarjetas QR — IE 0162</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;background:white;padding:10px;}.grid{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-start;}.tarjeta{width:200px;border-radius:12px;overflow:hidden;border:1.5px solid #d4ddd6;background:white;page-break-inside:avoid;}.hdr{background:#0f3d22;color:white;padding:10px;text-align:center;border-bottom:4px solid #2ecc71;}.colegio{font-size:8px;font-weight:bold;line-height:1.5;}.sub{font-size:7.5px;opacity:.65;margin-top:2px;}.qr-wrap{padding:10px;text-align:center;background:#f8f9f8;border-bottom:1px solid #e8ece8;}.sep{height:1px;background:#e0e6e1;margin:0 10px;}.id-txt{font-size:9px;color:#9aaa9d;text-align:center;padding:5px 0 2px;font-family:monospace;font-weight:bold;}.nombre{font-size:13px;font-weight:bold;text-align:center;padding:2px 8px 2px;color:#1c2b1e;}.grado{font-size:10px;font-weight:bold;color:#1a6b3a;text-align:center;padding:2px 0 8px;}.ftr{background:#0f3d22;color:rgba(255,255,255,.45);font-size:7px;text-align:center;padding:5px;}@media print{body{padding:4px;}.grid{gap:6px;}}</style></head><body><div class="grid">${rows}</div><script>window.onload=()=>setTimeout(()=>window.print(),1200);<\/script>
+<!-- ══ MODAL EDITAR ESTUDIANTE ══ -->
+<div id="modalEditarEst" class="modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">✏️ Editar Estudiante</span>
+      <button class="modal-close" onclick="document.getElementById('modalEditarEst').classList.remove('open')">✕</button>
+    </div>
+    <input type="hidden" id="editEstId">
+    <div class="form-group"><label>Nombre completo *</label>
+      <input type="text" id="editEstNombre" placeholder="Nombre completo">
+    </div>
+    <div class="form-group"><label>Grado *</label>
+      <select id="editEstGrado">
+        <option value="1°">1° Primaria</option>
+        <option value="2°">2° Primaria</option>
+        <option value="3°">3° Primaria</option>
+        <option value="4°">4° Primaria</option>
+        <option value="5°">5° Primaria</option>
+        <option value="6°">6° Primaria</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Sección *</label>
+      <select id="editEstSeccion">
+        <option value="A">Sección A</option>
+        <option value="B">Sección B</option>
+        <option value="C">Sección C</option>
+        <option value="D">Sección D</option>
+        <option value="E">Sección E</option>
+      </select>
+    </div>
+    <div class="form-group"><label>DNI del apoderado *</label>
+      <input type="text" id="editEstDNI" placeholder="8 dígitos" maxlength="8">
+    </div>
+    <div class="form-group"><label>Teléfono</label>
+      <input type="text" id="editEstTelefono" placeholder="Opcional">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:4px;">
+      <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="guardarEdicionEstudiante()">💾 Guardar cambios</button>
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="document.getElementById('modalEditarEst').classList.remove('open')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+</body></html>`;
   const w=window.open('','_blank');
   if(!w){notif('❌ Permite ventanas emergentes en tu navegador','error');return;}
   w.document.write(html); 
@@ -1951,7 +2038,51 @@ async function exportarPDF() {
   const fecha=getFecha();
   const asistencias=await fsQuery('asistencia',FB.where('fecha','==',fecha));
   const presSet=new Set(asistencias.map(a=>a.estudianteId));
-  const html=`<html><head><meta charset="UTF-8"><style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px;}h1{font-size:16px;color:#1a6b3a;}h2{font-size:13px;color:#555;}table{width:100%;border-collapse:collapse;margin-top:10px;}th{background:#1a6b3a;color:white;padding:8px;text-align:left;font-size:11px;}td{padding:7px 8px;border-bottom:1px solid #ddd;}.pres{background:#fdf0ef;}.aus{background:#fdf2f0;}.footer{margin-top:20px;font-size:10px;color:#999;border-top:1px solid #ddd;padding-top:8px;}</style></head><body><h1>📚 IE N.° 0162 SAN JOSÉ OBRERO — UGEL 05 — SJL — Control de Asistencia</h1><h2>Fecha: ${fecha} | Total: ${estudiantes.length} | Presentes: ${presSet.size}</h2><table><thead><tr><th>#</th><th>Estudiante</th><th>Grado</th><th>Sección</th><th>Estado</th><th>Firma</th></tr></thead><tbody>${estudiantes.map((e,i)=>`<tr class="${presSet.has(e.id)?'pres':'aus'}"><td>${i+1}</td><td>${e.nombre}</td><td>${e.grado}</td><td>${e.seccion}</td><td>${presSet.has(e.id)?'✅ Presente':'❌ Ausente'}</td><td style="width:120px;border-bottom:1px solid #999;">&nbsp;</td></tr>`).join('')}</tbody></table><div class="footer">Generado: ${new Date().toLocaleString('es-PE')} — Sistema AsistenciaQR Firebase</div></body></html>`;
+  const html=`<html><head><meta charset="UTF-8"><style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px;}h1{font-size:16px;color:#1a6b3a;}h2{font-size:13px;color:#555;}table{width:100%;border-collapse:collapse;margin-top:10px;}th{background:#1a6b3a;color:white;padding:8px;text-align:left;font-size:11px;}td{padding:7px 8px;border-bottom:1px solid #ddd;}.pres{background:#fdf0ef;}.aus{background:#fdf2f0;}.footer{margin-top:20px;font-size:10px;color:#999;border-top:1px solid #ddd;padding-top:8px;}</style></head><body><h1>📚 IE N.° 0162 SAN JOSÉ OBRERO — UGEL 05 — SJL — Control de Asistencia</h1><h2>Fecha: ${fecha} | Total: ${estudiantes.length} | Presentes: ${presSet.size}</h2><table><thead><tr><th>#</th><th>Estudiante</th><th>Grado</th><th>Sección</th><th>Estado</th><th>Firma</th></tr></thead><tbody>${estudiantes.map((e,i)=>`<tr class="${presSet.has(e.id)?'pres':'aus'}"><td>${i+1}</td><td>${e.nombre}</td><td>${e.grado}</td><td>${e.seccion}</td><td>${presSet.has(e.id)?'✅ Presente':'❌ Ausente'}</td><td style="width:120px;border-bottom:1px solid #999;">&nbsp;</td></tr>`).join('')}</tbody></table><div class="footer">Generado: ${new Date().toLocaleString('es-PE')} — Sistema AsistenciaQR Firebase</div>
+<!-- ══ MODAL EDITAR ESTUDIANTE ══ -->
+<div id="modalEditarEst" class="modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">✏️ Editar Estudiante</span>
+      <button class="modal-close" onclick="document.getElementById('modalEditarEst').classList.remove('open')">✕</button>
+    </div>
+    <input type="hidden" id="editEstId">
+    <div class="form-group"><label>Nombre completo *</label>
+      <input type="text" id="editEstNombre" placeholder="Nombre completo">
+    </div>
+    <div class="form-group"><label>Grado *</label>
+      <select id="editEstGrado">
+        <option value="1°">1° Primaria</option>
+        <option value="2°">2° Primaria</option>
+        <option value="3°">3° Primaria</option>
+        <option value="4°">4° Primaria</option>
+        <option value="5°">5° Primaria</option>
+        <option value="6°">6° Primaria</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Sección *</label>
+      <select id="editEstSeccion">
+        <option value="A">Sección A</option>
+        <option value="B">Sección B</option>
+        <option value="C">Sección C</option>
+        <option value="D">Sección D</option>
+        <option value="E">Sección E</option>
+      </select>
+    </div>
+    <div class="form-group"><label>DNI del apoderado *</label>
+      <input type="text" id="editEstDNI" placeholder="8 dígitos" maxlength="8">
+    </div>
+    <div class="form-group"><label>Teléfono</label>
+      <input type="text" id="editEstTelefono" placeholder="Opcional">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:4px;">
+      <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="guardarEdicionEstudiante()">💾 Guardar cambios</button>
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="document.getElementById('modalEditarEst').classList.remove('open')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+</body></html>`;
   const w=window.open('','_blank');
   w.document.write(html); w.document.close();
   setTimeout(()=>w.print(),500);
@@ -2191,5 +2322,49 @@ function init() {
 }
 window.onload=init;
 </script>
+
+<!-- ══ MODAL EDITAR ESTUDIANTE ══ -->
+<div id="modalEditarEst" class="modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">✏️ Editar Estudiante</span>
+      <button class="modal-close" onclick="document.getElementById('modalEditarEst').classList.remove('open')">✕</button>
+    </div>
+    <input type="hidden" id="editEstId">
+    <div class="form-group"><label>Nombre completo *</label>
+      <input type="text" id="editEstNombre" placeholder="Nombre completo">
+    </div>
+    <div class="form-group"><label>Grado *</label>
+      <select id="editEstGrado">
+        <option value="1°">1° Primaria</option>
+        <option value="2°">2° Primaria</option>
+        <option value="3°">3° Primaria</option>
+        <option value="4°">4° Primaria</option>
+        <option value="5°">5° Primaria</option>
+        <option value="6°">6° Primaria</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Sección *</label>
+      <select id="editEstSeccion">
+        <option value="A">Sección A</option>
+        <option value="B">Sección B</option>
+        <option value="C">Sección C</option>
+        <option value="D">Sección D</option>
+        <option value="E">Sección E</option>
+      </select>
+    </div>
+    <div class="form-group"><label>DNI del apoderado *</label>
+      <input type="text" id="editEstDNI" placeholder="8 dígitos" maxlength="8">
+    </div>
+    <div class="form-group"><label>Teléfono</label>
+      <input type="text" id="editEstTelefono" placeholder="Opcional">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:4px;">
+      <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="guardarEdicionEstudiante()">💾 Guardar cambios</button>
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="document.getElementById('modalEditarEst').classList.remove('open')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
