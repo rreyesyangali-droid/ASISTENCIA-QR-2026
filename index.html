@@ -1257,7 +1257,7 @@ async function agregarEstudiante() {
   if(btnAgregar){btnAgregar.disabled=false;btnAgregar.textContent='➕ Agregar Estudiante';}
 }
 
-async async function renderEstudiantes() {
+async function renderEstudiantes() {
   const c = document.getElementById('listaEstudiantes');
   if (!c) return;
   c.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--texto-suave);">⏳ Cargando…</div>';
@@ -1297,26 +1297,26 @@ function generarQR(id, estudiante) {
     if (!el) return;
     el.innerHTML = '';
     const texto = JSON.stringify({id, nombre:estudiante.nombre, grado:estudiante.grado, seccion:estudiante.seccion});
+    // Intentar QRCode.js primero
+    let generado = false;
     try {
-      // Método 1: QRCode.js
-      new QRCode(el, { text: texto, width:76, height:76, correctLevel:QRCode.CorrectLevel.M });
-    } catch(e1) {
-      try {
-        // Método 2: qrcode-generator
-        const qr = qrcode(0, 'M');
-        qr.addData(texto);
-        qr.make();
-        el.innerHTML = qr.createImgTag(2, 4);
-      } catch(e2) {
-        // Método 3: API externa como fallback
-        const img = document.createElement('img');
-        img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=76x76&data=' + encodeURIComponent(texto);
-        img.width = 76; img.height = 76;
-        img.style.borderRadius = '4px';
-        el.appendChild(img);
-      }
+      new QRCode(el, { text: texto, width:74, height:74, correctLevel:QRCode.CorrectLevel.M });
+      generado = true;
+    } catch(e) { generado = false; }
+    // Si falla, usar imagen de API externa (siempre funciona)
+    if (!generado || !el.querySelector('canvas,img')) {
+      setTimeout(() => {
+        if (!el.querySelector('canvas,img')) {
+          const img = document.createElement('img');
+          img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=74x74&margin=4&data=' + encodeURIComponent(texto);
+          img.width = 74; img.height = 74;
+          img.style.cssText = 'border-radius:4px;display:block;';
+          el.innerHTML = '';
+          el.appendChild(img);
+        }
+      }, 500);
     }
-  }, 300);
+  }, 200);
 }
 
 async function eliminarEstudiante(id) {
@@ -1330,68 +1330,85 @@ async function eliminarEstudiante(id) {
 async function descargarQR(id) {
   const e = _estudiantesCache.find(x=>x.id===id) || await fsGet('estudiantes', id);
   if (!e) { notif('❌ Estudiante no encontrado','error'); return; }
-  notif('⏳ Generando tarjeta QR...','info');
-  // Crear QR temporal fuera de la vista
-  const qrTemp = document.createElement('div');
-  qrTemp.style.cssText = 'position:fixed;left:-9999px;top:0;width:200px;height:200px;background:white;';
-  document.body.appendChild(qrTemp);
-  const texto = JSON.stringify({id, nombre:e.nombre, grado:e.grado, seccion:e.seccion});
-  let qrCanvas = null;
-  try {
-    await new Promise((res) => {
-      new QRCode(qrTemp, { text: texto, width:180, height:180, correctLevel:QRCode.CorrectLevel.M });
-      setTimeout(() => { qrCanvas = qrTemp.querySelector('canvas'); res(); }, 600);
-    });
-  } catch(err) { console.warn('QRCode error:', err); }
-  if (!qrCanvas) { 
-    document.body.removeChild(qrTemp);
-    // Fallback: descargar con imagen de API
-    const a = document.createElement('a');
-    a.href = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(texto);
-    a.download = 'QR_'+e.nombre.replace(/ /g,'_')+'.png';
-    a.target = '_blank';
-    a.click();
-    notif('📥 QR descargado (modo alternativo)','success');
-    return;
-  }
-  // Continuar con canvas...
-  const dummy = null; // placeholder para mantener el bloque
+  notif('⏳ Generando tarjeta...','info');
 
-  const W=320,H=400;
+  const texto = JSON.stringify({id, nombre:e.nombre, grado:e.grado, seccion:e.seccion});
+  const qrURL = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=10&data=' + encodeURIComponent(texto);
+
+  // Cargar imagen del QR desde API externa (siempre funciona)
+  const qrImg = new Image();
+  qrImg.crossOrigin = 'anonymous';
+  qrImg.src = qrURL;
+
+  await new Promise((res, rej) => {
+    qrImg.onload = res;
+    qrImg.onerror = rej;
+    setTimeout(res, 4000); // timeout de seguridad
+  });
+
+  const W=320, H=400;
   const card = document.createElement('canvas');
   card.width=W; card.height=H;
   const ctx = card.getContext('2d');
-  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H);
-  ctx.fillStyle='#0f3d22'; ctx.fillRect(0,0,W,80);
-  ctx.fillStyle='#2ecc71'; ctx.fillRect(0,80,W,6);
-  ctx.fillStyle='#ffffff'; ctx.font='bold 13px Arial'; ctx.textAlign='center';
-  ctx.fillText('IE N.° 0162 - San José Obrero', W/2, 22);
-  ctx.font='9px Arial'; ctx.fillStyle='rgba(255,255,255,0.8)';
-  ctx.fillText('UGEL 05 — San Juan de Lurigancho', W/2, 37);
-  ctx.font='11px Arial'; ctx.fillStyle='rgba(255,255,255,0.7)';
-  ctx.fillText('Tarjeta de Asistencia Estudiantil', W/2, 53);
-  ctx.font='10px Arial'; ctx.fillStyle='rgba(255,255,255,0.5)';
-  ctx.fillText('Sistema AsistenciaQR — Firebase', W/2, 68);
-  const qrSize=180, qrX=(W-qrSize)/2, qrY=100;
-  ctx.fillStyle='#f0f2f0'; ctx.beginPath(); ctx.roundRect(qrX-10,qrY-10,qrSize+20,qrSize+20,12); ctx.fill();
-  ctx.fillStyle='#ffffff'; ctx.beginPath(); ctx.roundRect(qrX-6,qrY-6,qrSize+12,qrSize+12,8); ctx.fill();
-  ctx.drawImage(qrCanvas,qrX,qrY,qrSize,qrSize);
-  ctx.strokeStyle='#d4ddd6'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(20,296); ctx.lineTo(W-20,296); ctx.stroke();
-  ctx.font='bold 10px monospace'; ctx.fillStyle='#9aaa9d'; ctx.textAlign='center';
-  ctx.fillText('ID: '+id.substring(0,8), W/2, 313);
-  ctx.font='bold 18px Arial'; ctx.fillStyle='#1c2b1e';
-  let nombre=e.nombre; if(ctx.measureText(nombre).width>W-40) nombre=nombre.split(' ').slice(0,3).join(' ');
-  ctx.fillText(nombre, W/2, 338);
-  ctx.font='bold 13px Arial'; ctx.fillStyle='#1a6b3a';
-  ctx.fillText(e.grado+' Primaria  ·  Sección '+e.seccion, W/2, 360);
-  ctx.fillStyle='#0f3d22'; ctx.fillRect(0,375,W,25);
-  ctx.font='9px Arial'; ctx.fillStyle='rgba(255,255,255,.5)';
-  ctx.fillText('No compartir — Solo uso interno del colegio', W/2, 389);
 
+  // Fondo blanco
+  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H);
+
+  // Header verde oscuro
+  ctx.fillStyle='#0f3d22'; ctx.fillRect(0,0,W,80);
+  ctx.fillStyle='#2ecc71'; ctx.fillRect(0,78,W,5);
+
+  // Textos header
+  ctx.textAlign='center';
+  ctx.fillStyle='#ffffff';
+  ctx.font='bold 13px Arial';
+  ctx.fillText('IE N.° 0162 — San José Obrero', W/2, 24);
+  ctx.font='9px Arial'; ctx.fillStyle='rgba(255,255,255,0.75)';
+  ctx.fillText('UGEL 05 — San Juan de Lurigancho', W/2, 40);
+  ctx.font='10px Arial'; ctx.fillStyle='rgba(255,255,255,0.6)';
+  ctx.fillText('Tarjeta de Asistencia Estudiantil', W/2, 56);
+  ctx.font='9px Arial'; ctx.fillStyle='rgba(255,255,255,0.4)';
+  ctx.fillText('Sistema AsistenciaQR — Firebase', W/2, 70);
+
+  // Fondo del QR
+  ctx.fillStyle='#f5f7f5';
+  ctx.fillRect(60, 93, 200, 200);
+  ctx.fillStyle='#ffffff';
+  ctx.fillRect(64, 97, 192, 192);
+
+  // Dibujar QR
+  try { ctx.drawImage(qrImg, 70, 103, 180, 180); } catch(err) { console.warn('QR draw error:', err); }
+
+  // Línea separadora
+  ctx.strokeStyle='#dde3de'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(24,306); ctx.lineTo(W-24,306); ctx.stroke();
+
+  // ID
+  ctx.font='bold 9px monospace'; ctx.fillStyle='#aab8ad'; ctx.textAlign='center';
+  ctx.fillText('ID: '+id.substring(0,8).toUpperCase(), W/2, 322);
+
+  // Nombre
+  ctx.font='bold 17px Arial'; ctx.fillStyle='#1a2b1e';
+  let nombre = e.nombre;
+  if(ctx.measureText(nombre).width > W-40) nombre = nombre.split(' ').slice(0,3).join(' ');
+  ctx.fillText(nombre, W/2, 347);
+
+  // Grado y sección
+  ctx.font='bold 12px Arial'; ctx.fillStyle='#1a6b3a';
+  ctx.fillText(e.grado+' Primaria  ·  Sección '+e.seccion, W/2, 367);
+
+  // Footer
+  ctx.fillStyle='#0f3d22'; ctx.fillRect(0,378,W,22);
+  ctx.font='8px Arial'; ctx.fillStyle='rgba(255,255,255,0.4)';
+  ctx.fillText('IE N.° 0162 — Solo uso interno del colegio', W/2, 392);
+
+  // Descargar
   const a = document.createElement('a');
   a.href = card.toDataURL('image/png');
-  a.download = 'QR_'+e.nombre.replace(/ /g,'_')+'_'+e.grado+e.seccion+'.png';
+  a.download = 'QR_'+e.nombre.replace(/\s+/g,'_')+'_'+e.grado+e.seccion+'.png';
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   notif('📥 Tarjeta QR descargada','success');
 }
 
@@ -1400,23 +1417,62 @@ async function imprimirQR() {
   const gf = document.getElementById('fGradoAdmin')?.value;
   const sf = document.getElementById('fSecAdmin')?.value;
   const filtrada = lista.filter(e=>(!gf||e.grado===gf)&&(!sf||e.seccion===sf));
+  if(!filtrada.length){notif('❌ No hay estudiantes para imprimir','error');return;}
+  notif('⏳ Preparando tarjetas...','info');
+  // Usar API externa para QR — siempre funciona sin canvas
   const rows = filtrada.map(e=>{
-    const qrEl=document.getElementById('qr_'+e.id);
-    const qrCanvas=qrEl?.querySelector('canvas');
-    const qrSrc=qrCanvas?qrCanvas.toDataURL('image/png'):'';
-    return `<div class="tarjeta"><div class="hdr"><div class="colegio">IE N.° 0162<br>SAN JOSÉ OBRERO — SJL</div><div class="sub">Tarjeta de Asistencia</div></div><div class="qr-wrap"><img src="${qrSrc}" width="130" height="130"></div><div class="sep"></div><div class="id-txt">ID: ${e.id.substring(0,8)}</div><div class="nombre">${e.nombre}</div><div class="grado">${e.grado} Prim. · Sección ${e.seccion}</div><div class="ftr">IE N.° 0162 — Uso interno</div></div>`;
+    const texto=encodeURIComponent(JSON.stringify({id:e.id,nombre:e.nombre,grado:e.grado,seccion:e.seccion}));
+    const qrSrc=`https://api.qrserver.com/v1/create-qr-code/?size=130x130&margin=6&data=${texto}`;
+    return `<div class="tarjeta">
+      <div class="hdr"><div class="colegio">IE N.° 0162<br>SAN JOSÉ OBRERO — SJL</div><div class="sub">Tarjeta de Asistencia Estudiantil</div></div>
+      <div class="qr-wrap"><img src="${qrSrc}" width="130" height="130" style="display:block;margin:auto;"></div>
+      <div class="sep"></div>
+      <div class="id-txt">ID: ${e.id.substring(0,8).toUpperCase()}</div>
+      <div class="nombre">${e.nombre}</div>
+      <div class="grado">${e.grado} Prim. · Sección ${e.seccion}</div>
+      <div class="ftr">IE N.° 0162 — Solo uso interno</div>
+    </div>`;
   }).join('');
-  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;background:white;padding:10px;}.grid{display:flex;flex-wrap:wrap;gap:8px;}.tarjeta{width:200px;border-radius:12px;overflow:hidden;border:1px solid #d4ddd6;background:white;page-break-inside:avoid;}.hdr{background:#0f3d22;color:white;padding:10px;text-align:center;border-bottom:4px solid #2ecc71;}.colegio{font-size:7.5px;font-weight:bold;line-height:1.4;}.sub{font-size:8px;opacity:.7;margin-top:2px;}.qr-wrap{padding:12px;text-align:center;background:#f8f9f8;}.sep{height:1px;background:#e0e6e1;margin:0 12px;}.id-txt{font-size:9px;color:#9aaa9d;text-align:center;padding:6px 0 2px;font-family:monospace;}.nombre{font-size:12px;font-weight:bold;text-align:center;padding:2px 8px;color:#1c2b1e;}.grado{font-size:10px;font-weight:bold;color:#1a6b3a;text-align:center;padding:2px 0 8px;}.ftr{background:#0f3d22;color:rgba(255,255,255,.4);font-size:7px;text-align:center;padding:5px;}@media print{body{padding:0;}}</style></head><body><div class="grid">${rows}</div></body></html>`;
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Tarjetas QR — IE 0162</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;background:white;padding:10px;}.grid{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-start;}.tarjeta{width:200px;border-radius:12px;overflow:hidden;border:1.5px solid #d4ddd6;background:white;page-break-inside:avoid;}.hdr{background:#0f3d22;color:white;padding:10px;text-align:center;border-bottom:4px solid #2ecc71;}.colegio{font-size:8px;font-weight:bold;line-height:1.5;}.sub{font-size:7.5px;opacity:.65;margin-top:2px;}.qr-wrap{padding:10px;text-align:center;background:#f8f9f8;border-bottom:1px solid #e8ece8;}.sep{height:1px;background:#e0e6e1;margin:0 10px;}.id-txt{font-size:9px;color:#9aaa9d;text-align:center;padding:5px 0 2px;font-family:monospace;font-weight:bold;}.nombre{font-size:13px;font-weight:bold;text-align:center;padding:2px 8px 2px;color:#1c2b1e;}.grado{font-size:10px;font-weight:bold;color:#1a6b3a;text-align:center;padding:2px 0 8px;}.ftr{background:#0f3d22;color:rgba(255,255,255,.45);font-size:7px;text-align:center;padding:5px;}@media print{body{padding:4px;}.grid{gap:6px;}}</style></head><body><div class="grid">${rows}</div><script>window.onload=()=>setTimeout(()=>window.print(),1200);<\/script></body></html>`;
   const w=window.open('','_blank');
-  w.document.write(html); w.document.close();
-  setTimeout(()=>w.print(),600);
+  if(!w){notif('❌ Permite ventanas emergentes en tu navegador','error');return;}
+  w.document.write(html); 
+  w.document.close();
 }
 
 // ══════════════════════════════════════════════════════
 // ASISTENCIA
 // ══════════════════════════════════════════════════════
+async function regManual(btn) {
+  const id = btn.dataset.id;
+  if (!id) return;
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  try {
+    const e = _estudiantesCache.find(x=>x.id===id) || await fsGet('estudiantes', id);
+    if (!e) { notif('❌ Estudiante no encontrado','error'); btn.disabled=false; btn.textContent='Registrar'; return; }
+    const fecha = getFecha();
+    const existente = await fsQuery('asistencia', FB.where('estudianteId','==',id), FB.where('fecha','==',fecha));
+    if (existente.length) { notif(`⚠️ ${e.nombre} ya fue registrado hoy`,'warning'); btn.disabled=false; btn.textContent='✅'; return; }
+    const hora = new Date().toLocaleTimeString('es-PE');
+    await fsAdd('asistencia',{ estudianteId:id, nombre:e.nombre, grado:e.grado, seccion:e.seccion, fecha, hora, registradoPor: sesion?.uid||'manual' });
+    notif(`✅ ${e.nombre} — ${e.grado} "${e.seccion}" — ${hora}`,'success');
+    btn.textContent='✅ OK';
+    btn.style.background='#27ae60';
+    renderListaAsistencia();
+    cargarTablaAsistencia();
+    actualizarStats();
+  } catch(err) {
+    console.error('regManual error:', err);
+    notif('❌ Error: '+err.message,'error');
+    btn.disabled=false; btn.textContent='Registrar';
+  }
+}
+
 async function registrarAsistencia(qrData) {
-  if (!ventanaActiva) { notif('⏰ Inicia la sesión primero (botón ▶)','error'); return false; }
+  // Permitir registro manual desde lista/búsqueda aunque ventana no esté activa
+  const esManual = sesion?.rol === 'admin' || sesion?.rol === 'tutor';
+  if (!ventanaActiva && !esManual) { notif('⏰ Inicia la sesión primero (botón ▶)','error'); return false; }
   try {
     const data = JSON.parse(qrData.trim());
     const estudianteId = data.id;
@@ -1438,7 +1494,7 @@ async function registrarAsistencia(qrData) {
     if (existente.length) { notif(`⚠️ ${nombre} ya fue registrado hoy`,'warning'); return false; }
 
     const hora = new Date().toLocaleTimeString('es-PE');
-    await fsAdd('asistencia',{ estudianteId, nombre, grado, seccion, fecha, hora, registradoPor: sesion?.uid||'padre' });
+    await fsAdd('asistencia',{ estudianteId, nombre, grado, seccion, fecha, hora, registradoPor: sesion?.uid||'manual' });
     notif(`✅ ${nombre} — ${grado} "${seccion}" — ${hora}`,'success');
     renderListaAsistencia();
     cargarTablaAsistencia();
@@ -1497,7 +1553,7 @@ async function cargarTablaAsistencia() {
   tbody.innerHTML = asist.map(a=>`<tr class="row-presente"><td>${a.nombre||a.estudianteId}</td><td>${a.grado||'—'}</td><td>${a.seccion||'—'}</td><td>${a.hora}</td><td><span class="badge badge-green">✅ Presente</span></td></tr>`).join('');
 }
 
-async async function buscarPorNombre() {
+async function buscarPorNombre() {
   const q = document.getElementById('buscarNombre').value.trim().toLowerCase();
   const c = document.getElementById('resBusqueda');
   if (q.length < 2) { c.innerHTML=''; return; }
@@ -1516,7 +1572,7 @@ async async function buscarPorNombre() {
   }).join('')||'<div style="padding:8px;font-size:12px;color:var(--texto-suave);">Sin resultados</div>';
 }
 
-async async function buscarPorDNI() {
+async function buscarPorDNI() {
   const dni=document.getElementById('dniBusq').value.trim();
   const c=document.getElementById('resDNI');
   if(!/^\d{8}$/.test(dni)){notif('❌ DNI debe tener 8 dígitos','error');return;}
@@ -1639,40 +1695,75 @@ function selMotivo(m) {
 function previsualizarEvidencia(input) {
   const file=input.files[0]; if(!file) return;
   const reader=new FileReader();
-  reader.onload=e=>{
-    evidenciaBase64=e.target.result;
-    document.getElementById('evidenciaImg').src=evidenciaBase64;
-    document.getElementById('evidenciaPreview').style.display='block';
+  reader.onload=ev=>{
+    // Comprimir imagen para que quepa en Firestore (max ~700KB)
+    const img=new Image();
+    img.onload=()=>{
+      const canvas=document.createElement('canvas');
+      let w=img.width, h=img.height;
+      // Reducir tamaño si es muy grande
+      const maxSize=800;
+      if(w>maxSize||h>maxSize){
+        if(w>h){h=Math.round(h*maxSize/w);w=maxSize;}
+        else{w=Math.round(w*maxSize/h);h=maxSize;}
+      }
+      canvas.width=w; canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      // Comprimir como JPEG calidad 0.6 (~200-400KB)
+      evidenciaBase64=canvas.toDataURL('image/jpeg',0.6);
+      document.getElementById('evidenciaImg').src=evidenciaBase64;
+      document.getElementById('evidenciaPreview').style.display='block';
+      const kb=Math.round(evidenciaBase64.length*0.75/1024);
+      if(kb>700) notif('⚠️ Imagen aún muy grande ('+kb+'KB), prueba con otra foto','warning');
+    };
+    img.src=ev.target.result;
   };
   reader.readAsDataURL(file);
 }
 
 async function enviarJustificacion() {
-  if(!motivoSel||!justifEstudianteId) return;
-  const detalle=document.getElementById('justifDetalle').value.trim();
-  const fecha=getFecha();
-  const hora=new Date().toLocaleTimeString('es-PE');
-  const e=await fsGet('estudiantes',justifEstudianteId);
-  const justif={
-    estudianteId:justifEstudianteId,
-    nombre:e?.nombre||'', grado:e?.grado||'', seccion:e?.seccion||'',
-    fecha, hora, motivo:motivoSel, detalle,
-    evidencia:motivoSel!=='alerta'?(evidenciaBase64||null):null,
-    estado:motivoSel==='alerta'?'alerta':'pendiente',
-    telefono:e?.telefono||''
-  };
-  await fsAdd('justificaciones',justif);
-  document.getElementById('modalJustif').classList.remove('open');
-  if(motivoSel==='alerta'){
-    notif('🚨 ALERTA enviada al tutor','error');
-    const msg=encodeURIComponent(`🚨 ALERTA URGENTE — ${e?.nombre||''} (${e?.grado||''} "${e?.seccion||''}") salió de casa pero NO llegó al colegio. Fecha: ${fecha}`);
-    setTimeout(()=>{if(confirm('¿Enviar alerta por WhatsApp también?'))window.open(`https://wa.me/?text=${msg}`,'_blank');},500);
-  }else{
-    notif('📄 Justificación enviada — pendiente de revisión','success');
+  if(!motivoSel||!justifEstudianteId){notif('❌ Selecciona un motivo primero','error');return;}
+  const btnEnv=document.getElementById('btnEnviarJustif');
+  if(btnEnv){btnEnv.disabled=true;btnEnv.textContent='⏳ Enviando...';}
+  try {
+    // Asegurar autenticación anónima para escritura
+    if (!FB.auth.currentUser) {
+      await FB.signInAnonymously(FB.auth);
+      await new Promise(r=>setTimeout(r,600));
+    }
+    const detalle=document.getElementById('justifDetalle').value.trim();
+    const fecha=getFecha();
+    const hora=new Date().toLocaleTimeString('es-PE');
+    const e=await fsGet('estudiantes',justifEstudianteId);
+    const justif={
+      estudianteId:justifEstudianteId,
+      nombre:e?.nombre||'', grado:e?.grado||'', seccion:e?.seccion||'',
+      fecha, hora, motivo:motivoSel, detalle,
+      evidencia:motivoSel!=='alerta'?(evidenciaBase64||null):null,
+      estado:motivoSel==='alerta'?'alerta':'pendiente',
+      telefono:e?.telefono||''
+    };
+    await fsAdd('justificaciones',justif);
+    document.getElementById('modalJustif').classList.remove('open');
+    if(motivoSel==='alerta'){
+      notif('🚨 ALERTA enviada al tutor','error');
+      const msg=encodeURIComponent(`🚨 ALERTA URGENTE — ${e?.nombre||''} (${e?.grado||''} "${e?.seccion||''}") salió de casa pero NO llegó al colegio. Fecha: ${fecha}`);
+      setTimeout(()=>{if(confirm('¿Enviar alerta por WhatsApp también?'))window.open(`https://wa.me/?text=${msg}`,'_blank');},500);
+    }else{
+      notif('📄 Justificación enviada — pendiente de revisión','success');
+    }
+    renderAlertasBadge();
+    const hijos=await fsQuery('estudiantes',FB.where('dniPadre','==',e?.dniPadre||''));
+    renderHijosInfo(hijos);
+  } catch(err) {
+    console.error('Error enviarJustificacion:', err);
+    if(err.code==='permission-denied'){
+      notif('❌ Sin permisos — verifica las reglas de Firestore','error');
+    } else {
+      notif('❌ Error al enviar: '+err.message,'error');
+    }
   }
-  renderAlertasBadge();
-  const hijos=await fsQuery('estudiantes',FB.where('dniPadre','==',e?.dniPadre||''));
-  renderHijosInfo(hijos);
+  if(btnEnv){btnEnv.disabled=false;btnEnv.textContent='📤 Enviar justificación';}
 }
 
 async function renderJustificaciones() {
