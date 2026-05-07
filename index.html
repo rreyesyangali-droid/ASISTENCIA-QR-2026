@@ -1449,22 +1449,39 @@ async function regManual(btn) {
   btn.disabled = true;
   btn.textContent = '⏳';
   try {
+    // Asegurar que hay usuario autenticado
+    if (!FB.auth.currentUser) {
+      await FB.signInAnonymously(FB.auth);
+      await new Promise(r=>setTimeout(r,600));
+    }
     const e = _estudiantesCache.find(x=>x.id===id) || await fsGet('estudiantes', id);
     if (!e) { notif('❌ Estudiante no encontrado','error'); btn.disabled=false; btn.textContent='Registrar'; return; }
     const fecha = getFecha();
     const existente = await fsQuery('asistencia', FB.where('estudianteId','==',id), FB.where('fecha','==',fecha));
-    if (existente.length) { notif(`⚠️ ${e.nombre} ya fue registrado hoy`,'warning'); btn.disabled=false; btn.textContent='✅'; return; }
+    if (existente.length) { notif(`⚠️ ${e.nombre} ya fue registrado hoy`,'warning'); btn.disabled=false; btn.textContent='✅ Ya registrado'; return; }
     const hora = new Date().toLocaleTimeString('es-PE');
-    await fsAdd('asistencia',{ estudianteId:id, nombre:e.nombre, grado:e.grado, seccion:e.seccion, fecha, hora, registradoPor: sesion?.uid||'manual' });
+    // Verificar auth antes de escribir
+    const user = FB.auth.currentUser;
+    console.log('Auth user:', user?.uid, 'Sesion rol:', sesion?.rol);
+    if (!user) {
+      notif('❌ No hay sesión activa — recarga la página e inicia sesión','error');
+      btn.disabled=false; btn.textContent='Registrar'; return;
+    }
+    await fsAdd('asistencia',{ estudianteId:id, nombre:e.nombre, grado:e.grado, seccion:e.seccion, fecha, hora, registradoPor: user.uid||'manual' });
     notif(`✅ ${e.nombre} — ${e.grado} "${e.seccion}" — ${hora}`,'success');
-    btn.textContent='✅ OK';
+    btn.textContent='✅ Registrado';
     btn.style.background='#27ae60';
+    btn.style.cursor='default';
     renderListaAsistencia();
     cargarTablaAsistencia();
     actualizarStats();
   } catch(err) {
     console.error('regManual error:', err);
-    notif('❌ Error: '+err.message,'error');
+    if(err.code==='permission-denied'){
+      notif('❌ Sin permisos — verifica las reglas de Firestore','error');
+    } else {
+      notif('❌ Error: '+err.message,'error');
+    }
     btn.disabled=false; btn.textContent='Registrar';
   }
 }
