@@ -621,7 +621,7 @@ tr.row-alerta{background:#fdf2f0;border-left:3px solid var(--rojo);}
           <div class="card-header">
             <span class="card-title">📋 Estado de Asistencia — Hoy</span>
             <div class="filters" style="margin:0;">
-              <select id="fGradoAux" onchange="renderListaAsistencia()"><option value="">Todos</option><option value="1°">1°</option><option value="2°">2°</option><option value="3°">3°</option><option value="4°">4°</option><option value="5°">5°</option><option value="6°">6°</option></select>
+              <div id="filtrosAsistencia" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;"><select id="fGradoAux" onchange="renderListaAsistencia()"><option value="">Todos</option><option value="1°">1°</option><option value="2°">2°</option><option value="3°">3°</option><option value="4°">4°</option><option value="5°">5°</option><option value="6°">6°</option></select>
               <select id="fSecAux" onchange="renderListaAsistencia()"><option value="">Todas</option><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option></select>
             </div>
           </div>
@@ -1559,6 +1559,49 @@ async function regManual(btn) {
   }
 }
 
+
+async function marcarAusenteWsp(btn) {
+  const id = btn.dataset.id;
+  const nombre = btn.dataset.nombre;
+  const grado = btn.dataset.grado;
+  const seccion = btn.dataset.seccion;
+  const tel = btn.dataset.tel;
+  const fecha = getFecha();
+
+  // Guardar ausencia en Firestore
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  try {
+    // Verificar si ya existe registro de ausencia
+    const exist = await fsQuery('ausencias', FB.where('estudianteId','==',id), FB.where('fecha','==',fecha));
+    if (!exist.length) {
+      await fsAdd('ausencias', { estudianteId:id, nombre, grado, seccion, fecha, registradoPor: sesion?.uid||'tutor', hora: new Date().toLocaleTimeString('es-PE') });
+    }
+    notif(`❌ ${nombre} marcado como ausente`,'warning');
+    btn.textContent='❌ Ausente';
+    btn.style.background='#c0392b';
+    btn.disabled = true;
+  } catch(err) {
+    console.error(err);
+    btn.disabled=false; btn.textContent='❌ Ausente';
+  }
+
+  // Mensaje WhatsApp para el padre
+  const numLimpio = tel.replace(/\D/g,'');
+  const msg = `Estimado apoderado, le informamos que el/la estudiante *${nombre}* de *${grado} Sección ${seccion}* de la IE N.° 0162 San José Obrero *NO asistió* el día de hoy *${fecha}*. Por favor justifique la inasistencia ingresando al sistema de asistencia. Gracias.`;
+  const urlWsp = numLimpio 
+    ? `https://wa.me/51${numLimpio}?text=${encodeURIComponent(msg)}`
+    : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+
+  // Mostrar modal con opciones
+  if (confirm(`📱 ¿Enviar WhatsApp al apoderado de ${nombre} notificando la inasistencia?`)) {
+    window.open(urlWsp, '_blank');
+  }
+
+  renderListaAsistencia();
+  actualizarStats();
+}
+
 async function registrarAsistencia(qrData) {
   // Permitir registro manual desde lista/búsqueda aunque ventana no esté activa
   const esManual = sesion?.rol === 'admin' || sesion?.rol === 'tutor';
@@ -1603,12 +1646,21 @@ async function renderListaAsistencia() {
   
   let lista = await fsGetAll('estudiantes');
   _estudiantesCache = lista;
-  const gf = document.getElementById('fGradoAux')?.value;
-  const sf = document.getElementById('fSecAux')?.value;
-  if (sesion?.grados?.length) lista = lista.filter(e=>sesion.grados.includes(e.grado));
-  if (sesion?.secciones?.length) lista = lista.filter(e=>sesion.secciones.includes(e.seccion));
-  if (gf) lista = lista.filter(e=>e.grado===gf);
-  if (sf) lista = lista.filter(e=>e.seccion===sf);
+
+  // Tutor: filtrar SOLO por su grado y sección asignados, sin excepciones
+  if (sesion?.rol === 'tutor') {
+    if (sesion?.grados?.length) lista = lista.filter(e=>sesion.grados.includes(e.grado));
+    if (sesion?.secciones?.length) lista = lista.filter(e=>sesion.secciones.includes(e.seccion));
+    // Ocultar filtros de grado/sección para el tutor
+    const filtrosDiv = document.getElementById('filtrosAsistencia');
+    if (filtrosDiv) filtrosDiv.style.display = 'none';
+  } else {
+    // Admin puede filtrar libremente
+    const gf = document.getElementById('fGradoAux')?.value;
+    const sf = document.getElementById('fSecAux')?.value;
+    if (gf) lista = lista.filter(e=>e.grado===gf);
+    if (sf) lista = lista.filter(e=>e.seccion===sf);
+  }
 
   const fecha = getFecha();
   const asist = await fsQuery('asistencia', FB.where('fecha','==',fecha));
@@ -1623,11 +1675,14 @@ async function renderListaAsistencia() {
     const pres=presSet.has(e.id), just=justifSet.has(e.id);
     const cls=pres?'presente':just?'justificado':'ausente';
     const badge=pres?'<span class="badge badge-green">✅ Presente</span>':just?'<span class="badge badge-blue">📄 Justificado</span>':'<span class="badge badge-red">❌ Ausente</span>';
-    return `<div class="student-card ${cls}">
+    return `<div class="student-card ${cls}" id="sc_${e.id}">
       <div class="student-name">${e.nombre}</div>
       <div class="student-grade">${e.grado} — Sección ${e.seccion}</div>
       ${badge}
-      ${!pres?`<br><button class="btn btn-success btn-sm" style="margin-top:6px;" data-id="${e.id}" onclick="regManual(this)">✅ Registrar</button>`:''}
+      <div style="margin-top:8px;display:flex;gap:5px;flex-wrap:wrap;justify-content:center;">
+        ${!pres?`<button class="btn btn-success btn-sm" data-id="${e.id}" onclick="regManual(this)">✅ Presente</button>`:''}
+        ${!pres&&!just?`<button class="btn btn-sm" style="background:#e67e22;color:white;" data-id="${e.id}" data-nombre="${e.nombre}" data-grado="${e.grado}" data-seccion="${e.seccion}" data-tel="${e.telefono||''}" onclick="marcarAusenteWsp(this)">❌ Ausente</button>`:''}
+      </div>
     </div>`;
   }).join('');
 }
@@ -1875,11 +1930,15 @@ async function renderJustificaciones() {
     <div class="justif-card ${j.estado}">
       <div class="justif-header">
         <div><div class="justif-nombre">${j.nombre}</div><div class="justif-sub">${j.grado} — Sección ${j.seccion} · ${j.fecha} ${j.hora}</div></div>
-        <div>${estadoBadge[j.estado]||''}</div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          ${estadoBadge[j.estado]||''}
+          ${sesion?.rol==='admin'?`<button class="btn btn-sm" style="background:#e74c3c;color:white;padding:3px 8px;font-size:11px;" onclick="eliminarJustificacion('${j.id}')">🗑</button>`:''}
+        </div>
       </div>
       <div class="justif-motivo"><strong>${motLabels[j.motivo]||j.motivo}</strong>${j.detalle?'<br><span style="color:var(--texto-suave);">'+j.detalle+'</span>':''}</div>
       ${j.evidencia?`<div class="justif-evidencia" onclick="verEvidencia('${j.evidencia}')"><img src="${j.evidencia}" alt="Evidencia"><span>Ver evidencia adjunta →</span></div>`:''}
-      ${j.estado==='alerta'&&j.telefono?`<a href="https://wa.me/${j.telefono}?text=${encodeURIComponent('🚨 ALERTA: '+j.nombre+' no llegó al colegio el '+j.fecha+'.')}" target="_blank" class="btn btn-danger btn-sm" style="margin-bottom:10px;text-decoration:none;">📱 Contactar por WhatsApp</a>`:''}
+      ${j.telefono?`<a href="https://wa.me/51${j.telefono.replace(/\D/g,'')}?text=${encodeURIComponent('📋 Sobre la justificación de '+j.nombre+' del '+j.fecha+': '+j.detalle)}" target="_blank" class="btn btn-sm" style="background:#25D366;color:white;margin-bottom:8px;text-decoration:none;display:inline-flex;align-items:center;gap:4px;">📱 WhatsApp apoderado</a>`:''}
+      ${j.estado==='alerta'&&j.telefono?`<a href="https://wa.me/51${j.telefono.replace(/\D/g,'')}?text=${encodeURIComponent('🚨 ALERTA: '+j.nombre+' no llegó al colegio el '+j.fecha+'.')}" target="_blank" class="btn btn-danger btn-sm" style="margin-bottom:10px;text-decoration:none;">🚨 ALERTA WhatsApp</a>`:''}
       ${j.estado==='pendiente'||j.estado==='alerta'?`<div class="justif-actions"><button class="btn btn-success btn-sm" onclick="cambiarEstadoJustif('${j.id}','aprobado')">✅ Aprobar</button><button class="btn btn-danger btn-sm" onclick="cambiarEstadoJustif('${j.id}','rechazado')">❌ Rechazar</button></div>`:''}
     </div>`).join('');
   const alertas=justifs.filter(j=>j.estado==='alerta');
@@ -1891,6 +1950,17 @@ async function cambiarEstadoJustif(id, estado) {
   await fsUpdate('justificaciones',id,{estado});
   notif(estado==='aprobado'?'✅ Justificación aprobada':'❌ Justificación rechazada', estado==='aprobado'?'success':'warning');
   renderJustificaciones(); renderAlertasBadge(); actualizarStats();
+}
+
+async function eliminarJustificacion(id) {
+  if (!confirm('¿Eliminar esta justificación? Esta acción no se puede deshacer.')) return;
+  try {
+    await FB.deleteDoc(FB.doc(FB.db, 'justificaciones', id));
+    notif('🗑 Justificación eliminada','success');
+    renderJustificaciones(); renderAlertasBadge(); actualizarStats();
+  } catch(err) {
+    notif('❌ Error al eliminar: '+err.message,'error');
+  }
 }
 
 function verEvidencia(src) {
