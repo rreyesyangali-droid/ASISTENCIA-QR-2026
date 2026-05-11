@@ -1594,6 +1594,29 @@ async function imprimirQR() {
   </div>
 </div>
 
+
+<!-- MODAL WHATSAPP AUSENTE -->
+<div id="modalWspAusente" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:white;border-radius:16px;padding:24px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div style="font-size:2em;text-align:center;margin-bottom:8px;">📱</div>
+    <div style="font-weight:700;font-size:15px;text-align:center;margin-bottom:8px;">Notificar al apoderado</div>
+    <div style="font-size:12px;color:#555;background:#f8f9f8;border-radius:8px;padding:10px;margin-bottom:14px;line-height:1.6;">
+      <strong id="modalWspNombre"></strong> fue marcado como <strong style="color:#c0392b;">AUSENTE</strong>.<br>
+      ¿Deseas enviar WhatsApp al apoderado?
+    </div>
+    <div style="display:flex;gap:10px;">
+      <a id="modalWspBtn" href="#" target="_blank" onclick="cerrarModalWsp()"
+         style="flex:1;background:#25D366;color:white;border-radius:10px;padding:12px;font-size:13px;font-weight:700;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:5px;">
+        📲 Enviar WhatsApp
+      </a>
+      <button onclick="cerrarModalWsp()"
+              style="flex:1;background:#eee;border:none;border-radius:10px;padding:12px;font-size:13px;cursor:pointer;font-family:inherit;">
+        Omitir
+      </button>
+    </div>
+  </div>
+</div>
+
 </body></html>`;
   const w=window.open('','_blank');
   if(!w){notif('❌ Permite ventanas emergentes en tu navegador','error');return;}
@@ -1661,7 +1684,11 @@ async function marcarAusenteWsp(btn) {
   try {
     const exist = await fsQuery('ausencias', FB.where('estudianteId','==',id), FB.where('fecha','==',fecha));
     if (!exist.length) {
-      await fsAdd('ausencias', { estudianteId:id, nombre, grado, seccion, fecha, registradoPor: sesion?.uid||'tutor', hora: new Date().toLocaleTimeString('es-PE') });
+      await fsAdd('ausencias', {
+        estudianteId:id, nombre, grado, seccion, fecha,
+        registradoPor: sesion?.uid||'tutor',
+        hora: new Date().toLocaleTimeString('es-PE')
+      });
     }
     notif('❌ ' + nombre + ' marcado como ausente','warning');
     btn.textContent = '❌ Ausente';
@@ -1671,51 +1698,46 @@ async function marcarAusenteWsp(btn) {
     const card = document.getElementById('sc_'+id);
     if (card) {
       card.className = 'student-card ausente';
-      const btnsDiv = card.querySelector('div[style*="margin-top:8px"]');
-      if (btnsDiv) btnsDiv.innerHTML = '<span class="badge badge-red" style="font-size:11px;">❌ Ausente registrado</span>';
     }
 
     // WhatsApp al padre
     const numLimpio = (tel||'').replace(/\D/g,'');
     const linkApp = window.location.href;
-    const msg = 'Estimado apoderado,\n\nLe informamos que su hijo(a) *' + nombre + '* de *' + grado + ' - Sección ' + seccion + '* de la *IE N.° 0162 San José Obrero*\n\n❌ *NO asistió* el día de hoy *' + fecha + '*.\n\nPor favor ingrese al siguiente enlace para justificar la inasistencia:\n' + linkApp + '\n\nGracias.\n_IE N.° 0162 — Sistema de Asistencia_';
-    const urlWsp = numLimpio ? 'https://wa.me/51' + numLimpio + '?text=' + encodeURIComponent(msg) : 'https://wa.me/?text=' + encodeURIComponent(msg);
+    const msg = 'Estimado apoderado,
 
-    // Mostrar modal WhatsApp con ID único
-    const modalId = 'modalWsp_' + id;
-    let mEl = document.getElementById(modalId);
-    if (!mEl) {
-      mEl = document.createElement('div');
-      mEl.id = modalId;
-      mEl.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
-      document.body.appendChild(mEl);
-    }
-    mEl.innerHTML = '<div style="background:white;border-radius:16px;padding:24px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">' +
-      '<div style="font-size:2em;text-align:center;margin-bottom:8px;">📱</div>' +
-      '<div style="font-weight:700;font-size:15px;text-align:center;margin-bottom:8px;">Notificar al apoderado</div>' +
-      '<div style="font-size:12px;color:#555;background:#f8f9f8;border-radius:8px;padding:10px;margin-bottom:14px;line-height:1.6;">' +
-        '<strong>' + nombre + '</strong> marcado como <strong style="color:#c0392b;">AUSENTE</strong>.<br>' +
-        '¿Enviar WhatsApp al apoderado?' +
-      '</div>' +
-      '<div style="display:flex;gap:10px;">' +
-        '<a href="' + urlWsp + '" target="_blank" onclick="document.getElementById(\\'' + modalId + '\\').remove()" ' +
-           'style="flex:1;background:#25D366;color:white;border-radius:10px;padding:12px;font-size:13px;font-weight:700;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:5px;">' +
-          '📲 Enviar WhatsApp' +
-        '</a>' +
-        '<button onclick="document.getElementById(\\'' + modalId + '\\').remove()" ' +
-                'style="flex:1;background:#eee;border:none;border-radius:10px;padding:12px;font-size:13px;cursor:pointer;">' +
-          'Omitir' +
-        '</button>' +
-      '</div>' +
-    '</div>';
-    mEl.style.display = 'flex';
+Le informamos que su hijo(a) *' + nombre + '* de *' + grado + ' - Seccion ' + seccion + '* de la *IE N. 0162 San Jose Obrero*
+
+ NO asistio el dia de hoy *' + fecha + '*.
+
+Por favor ingrese al siguiente enlace para justificar la inasistencia:
+' + linkApp + '
+
+Gracias.
+_IE N. 0162 - Sistema de Asistencia_';
+    const urlWsp = numLimpio
+      ? 'https://wa.me/51' + numLimpio + '?text=' + encodeURIComponent(msg)
+      : 'https://wa.me/?text=' + encodeURIComponent(msg);
+
+    // Guardar URL para el modal
+    window._wspUrl = urlWsp;
+    window._wspNombre = nombre;
+
+    // Mostrar modal
+    document.getElementById('modalWspAusente').style.display = 'flex';
+    document.getElementById('modalWspNombre').textContent = nombre;
+    document.getElementById('modalWspBtn').href = urlWsp;
 
   } catch(err) {
     console.error('marcarAusente error:', err);
-    notif('❌ Error: ' + err.message,'error');
-    btn.disabled=false; btn.textContent='❌ Ausente';
+    notif('Error: ' + err.message,'error');
+    btn.disabled=false;
+    btn.textContent='❌ Ausente';
   }
   actualizarStats();
+}
+
+function cerrarModalWsp() {
+  document.getElementById('modalWspAusente').style.display = 'none';
 }
 
 
@@ -2343,6 +2365,29 @@ async function exportarPDF() {
   </div>
 </div>
 
+
+<!-- MODAL WHATSAPP AUSENTE -->
+<div id="modalWspAusente" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:white;border-radius:16px;padding:24px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div style="font-size:2em;text-align:center;margin-bottom:8px;">📱</div>
+    <div style="font-weight:700;font-size:15px;text-align:center;margin-bottom:8px;">Notificar al apoderado</div>
+    <div style="font-size:12px;color:#555;background:#f8f9f8;border-radius:8px;padding:10px;margin-bottom:14px;line-height:1.6;">
+      <strong id="modalWspNombre"></strong> fue marcado como <strong style="color:#c0392b;">AUSENTE</strong>.<br>
+      ¿Deseas enviar WhatsApp al apoderado?
+    </div>
+    <div style="display:flex;gap:10px;">
+      <a id="modalWspBtn" href="#" target="_blank" onclick="cerrarModalWsp()"
+         style="flex:1;background:#25D366;color:white;border-radius:10px;padding:12px;font-size:13px;font-weight:700;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:5px;">
+        📲 Enviar WhatsApp
+      </a>
+      <button onclick="cerrarModalWsp()"
+              style="flex:1;background:#eee;border:none;border-radius:10px;padding:12px;font-size:13px;cursor:pointer;font-family:inherit;">
+        Omitir
+      </button>
+    </div>
+  </div>
+</div>
+
 </body></html>`;
   const w=window.open('','_blank');
   w.document.write(html); w.document.close();
@@ -2661,6 +2706,29 @@ window.onload=init;
     <div style="display:flex;gap:10px;margin-top:4px;">
       <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="guardarEdicionJustif()">💾 Guardar cambios</button>
       <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="document.getElementById('modalEditarJustif').classList.remove('open')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- MODAL WHATSAPP AUSENTE -->
+<div id="modalWspAusente" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:white;border-radius:16px;padding:24px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div style="font-size:2em;text-align:center;margin-bottom:8px;">📱</div>
+    <div style="font-weight:700;font-size:15px;text-align:center;margin-bottom:8px;">Notificar al apoderado</div>
+    <div style="font-size:12px;color:#555;background:#f8f9f8;border-radius:8px;padding:10px;margin-bottom:14px;line-height:1.6;">
+      <strong id="modalWspNombre"></strong> fue marcado como <strong style="color:#c0392b;">AUSENTE</strong>.<br>
+      ¿Deseas enviar WhatsApp al apoderado?
+    </div>
+    <div style="display:flex;gap:10px;">
+      <a id="modalWspBtn" href="#" target="_blank" onclick="cerrarModalWsp()"
+         style="flex:1;background:#25D366;color:white;border-radius:10px;padding:12px;font-size:13px;font-weight:700;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:5px;">
+        📲 Enviar WhatsApp
+      </a>
+      <button onclick="cerrarModalWsp()"
+              style="flex:1;background:#eee;border:none;border-radius:10px;padding:12px;font-size:13px;cursor:pointer;font-family:inherit;">
+        Omitir
+      </button>
     </div>
   </div>
 </div>
