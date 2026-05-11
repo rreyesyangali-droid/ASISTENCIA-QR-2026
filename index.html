@@ -455,7 +455,7 @@ tr.row-alerta{background:#fdf2f0;border-left:3px solid var(--rojo);}
 <!-- ══ SPLASH ══ -->
 <div id="splashScreen">
   <div class="splash-icon">📚</div>
-  <div class="splash-txt">Conectando con Firebase…</div>
+  <div class="splash-txt" id="splashTxt">Conectando...</div>
 </div>
 
 <!-- ══════ PANTALLA LOGIN ══════ -->
@@ -891,12 +891,27 @@ let _ignorarAuthChange = false; // bandera para bloquear listener durante setup
 document.addEventListener('fbready', async () => {
   FB = window._fb;
 
-  // Primero crear admin si no existe (ANTES de activar el listener)
-  await crearAdminInicial();
+  // Timeout de seguridad — si tarda más de 8 segundos, mostrar login igual
+  const splashTimeout = setTimeout(() => {
+    document.getElementById('splashScreen').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+  }, 8000);
+
+  // Actualizar mensaje del splash
+  const splashTxt = document.querySelector('.splash-txt');
+  if (splashTxt) splashTxt.textContent = 'Iniciando sistema...';
+
+  try {
+    // Crear admin si no existe
+    await crearAdminInicial();
+  } catch(e) {
+    console.warn('crearAdminInicial error:', e);
+  }
+
+  clearTimeout(splashTimeout);
 
   // Mostrar login
   document.getElementById('splashScreen').style.display = 'none';
-  // Actualizar estado Firebase
   const fbDot = document.getElementById('fbStatus');
   if(fbDot) fbDot.innerHTML = '<div class="fb-dot" style="background:#2ecc71"></div> Firebase Online';
   document.getElementById('loginScreen').style.display = 'flex';
