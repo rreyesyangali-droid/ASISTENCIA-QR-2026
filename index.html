@@ -1506,6 +1506,44 @@ async function imprimirQR() {
   </div>
 </div>
 
+
+<!-- ══ MODAL EDITAR JUSTIFICACIÓN ══ -->
+<div id="modalEditarJustif" class="modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">✏️ Editar Justificación</span>
+      <button class="modal-close" onclick="document.getElementById('modalEditarJustif').classList.remove('open')">✕</button>
+    </div>
+    <input type="hidden" id="editJustifId">
+    <div id="editJustifInfo" style="font-weight:700;font-size:13px;color:var(--texto-suave);margin-bottom:12px;"></div>
+    <div class="form-group">
+      <label>Motivo</label>
+      <select id="editJustifMotivo">
+        <option value="enfermedad">🤒 Enfermedad</option>
+        <option value="cita">🏥 Cita médica</option>
+        <option value="familiar">👨‍👩‍👧 Motivo familiar</option>
+        <option value="otro">📝 Otro motivo</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Descripción</label>
+      <textarea id="editJustifDetalle" rows="3" style="resize:none;padding:9px 12px;border:1.5px solid var(--borde);border-radius:8px;font-family:inherit;font-size:13px;outline:none;width:100%;"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Estado</label>
+      <select id="editJustifEstado">
+        <option value="pendiente">⏳ Pendiente</option>
+        <option value="aprobado">✅ Aprobado</option>
+        <option value="rechazado">❌ Rechazado</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:4px;">
+      <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="guardarEdicionJustif()">💾 Guardar cambios</button>
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="document.getElementById('modalEditarJustif').classList.remove('open')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 </body></html>`;
   const w=window.open('','_blank');
   if(!w){notif('❌ Permite ventanas emergentes en tu navegador','error');return;}
@@ -1568,39 +1606,68 @@ async function marcarAusenteWsp(btn) {
   const tel = btn.dataset.tel;
   const fecha = getFecha();
 
-  // Guardar ausencia en Firestore
   btn.disabled = true;
   btn.textContent = '⏳';
   try {
-    // Verificar si ya existe registro de ausencia
     const exist = await fsQuery('ausencias', FB.where('estudianteId','==',id), FB.where('fecha','==',fecha));
     if (!exist.length) {
       await fsAdd('ausencias', { estudianteId:id, nombre, grado, seccion, fecha, registradoPor: sesion?.uid||'tutor', hora: new Date().toLocaleTimeString('es-PE') });
     }
-    notif(`❌ ${nombre} marcado como ausente`,'warning');
-    btn.textContent='❌ Ausente';
-    btn.style.background='#c0392b';
-    btn.disabled = true;
+    notif('❌ ' + nombre + ' marcado como ausente','warning');
+    btn.textContent = '❌ Ausente';
+    btn.style.background = '#c0392b';
+
+    // Actualizar tarjeta visualmente
+    const card = document.getElementById('sc_'+id);
+    if (card) {
+      card.className = 'student-card ausente';
+      const btnsDiv = card.querySelector('div[style*="margin-top:8px"]');
+      if (btnsDiv) btnsDiv.innerHTML = '<span class="badge badge-red" style="font-size:11px;">❌ Ausente registrado</span>';
+    }
+
+    // WhatsApp al padre
+    const numLimpio = (tel||'').replace(/\D/g,'');
+    const linkApp = window.location.href;
+    const msg = 'Estimado apoderado,\n\nLe informamos que su hijo(a) *' + nombre + '* de *' + grado + ' - Sección ' + seccion + '* de la *IE N.° 0162 San José Obrero*\n\n❌ *NO asistió* el día de hoy *' + fecha + '*.\n\nPor favor ingrese al siguiente enlace para justificar la inasistencia:\n' + linkApp + '\n\nGracias.\n_IE N.° 0162 — Sistema de Asistencia_';
+    const urlWsp = numLimpio ? 'https://wa.me/51' + numLimpio + '?text=' + encodeURIComponent(msg) : 'https://wa.me/?text=' + encodeURIComponent(msg);
+
+    // Mostrar modal WhatsApp con ID único
+    const modalId = 'modalWsp_' + id;
+    let mEl = document.getElementById(modalId);
+    if (!mEl) {
+      mEl = document.createElement('div');
+      mEl.id = modalId;
+      mEl.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+      document.body.appendChild(mEl);
+    }
+    mEl.innerHTML = '<div style="background:white;border-radius:16px;padding:24px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">' +
+      '<div style="font-size:2em;text-align:center;margin-bottom:8px;">📱</div>' +
+      '<div style="font-weight:700;font-size:15px;text-align:center;margin-bottom:8px;">Notificar al apoderado</div>' +
+      '<div style="font-size:12px;color:#555;background:#f8f9f8;border-radius:8px;padding:10px;margin-bottom:14px;line-height:1.6;">' +
+        '<strong>' + nombre + '</strong> marcado como <strong style="color:#c0392b;">AUSENTE</strong>.<br>' +
+        '¿Enviar WhatsApp al apoderado?' +
+      '</div>' +
+      '<div style="display:flex;gap:10px;">' +
+        '<a href="' + urlWsp + '" target="_blank" onclick="document.getElementById('' + modalId + '').remove()" ' +
+           'style="flex:1;background:#25D366;color:white;border-radius:10px;padding:12px;font-size:13px;font-weight:700;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:5px;">' +
+          '📲 Enviar WhatsApp' +
+        '</a>' +
+        '<button onclick="document.getElementById('' + modalId + '').remove()" ' +
+                'style="flex:1;background:#eee;border:none;border-radius:10px;padding:12px;font-size:13px;cursor:pointer;">' +
+          'Omitir' +
+        '</button>' +
+      '</div>' +
+    '</div>';
+    mEl.style.display = 'flex';
+
   } catch(err) {
-    console.error(err);
+    console.error('marcarAusente error:', err);
+    notif('❌ Error: ' + err.message,'error');
     btn.disabled=false; btn.textContent='❌ Ausente';
   }
-
-  // Mensaje WhatsApp para el padre
-  const numLimpio = tel.replace(/\D/g,'');
-  const msg = `Estimado apoderado, le informamos que el/la estudiante *${nombre}* de *${grado} Sección ${seccion}* de la IE N.° 0162 San José Obrero *NO asistió* el día de hoy *${fecha}*. Por favor justifique la inasistencia ingresando al sistema de asistencia. Gracias.`;
-  const urlWsp = numLimpio 
-    ? `https://wa.me/51${numLimpio}?text=${encodeURIComponent(msg)}`
-    : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-
-  // Mostrar modal con opciones
-  if (confirm(`📱 ¿Enviar WhatsApp al apoderado de ${nombre} notificando la inasistencia?`)) {
-    window.open(urlWsp, '_blank');
-  }
-
-  renderListaAsistencia();
   actualizarStats();
 }
+
 
 async function registrarAsistencia(qrData) {
   // Permitir registro manual desde lista/búsqueda aunque ventana no esté activa
@@ -1647,13 +1714,28 @@ async function renderListaAsistencia() {
   let lista = await fsGetAll('estudiantes');
   _estudiantesCache = lista;
 
-  // Tutor: filtrar SOLO por su grado y sección asignados, sin excepciones
+  // Tutor: filtrar SOLO por su grado y sección asignados
   if (sesion?.rol === 'tutor') {
-    if (sesion?.grados?.length) lista = lista.filter(e=>sesion.grados.includes(e.grado));
-    if (sesion?.secciones?.length) lista = lista.filter(e=>sesion.secciones.includes(e.seccion));
+    // Filtrar por grado asignado
+    if (sesion?.grados?.length) {
+      lista = lista.filter(e => sesion.grados.includes(e.grado));
+    }
+    // Filtrar por sección asignada
+    if (sesion?.secciones?.length) {
+      lista = lista.filter(e => sesion.secciones.includes(e.seccion));
+    }
     // Ocultar filtros de grado/sección para el tutor
     const filtrosDiv = document.getElementById('filtrosAsistencia');
     if (filtrosDiv) filtrosDiv.style.display = 'none';
+    // Mostrar etiqueta de su aula
+    const c2 = document.getElementById('listaAsistencia');
+    if (c2 && !document.getElementById('tutorAulaLabel')) {
+      const lbl = document.createElement('div');
+      lbl.id = 'tutorAulaLabel';
+      lbl.style.cssText = 'grid-column:1/-1;background:var(--verde-claro);border-radius:10px;padding:8px 14px;font-size:12px;font-weight:700;color:var(--verde);margin-bottom:8px;';
+      lbl.textContent = `📚 Tu aula: ${sesion.grados?.join(', ')||'—'} — Sección ${sesion.secciones?.join(', ')||'—'}`;
+      c2.prepend(lbl);
+    }
   } else {
     // Admin puede filtrar libremente
     const gf = document.getElementById('fGradoAux')?.value;
@@ -1908,6 +1990,38 @@ async function enviarJustificacion() {
   if(btnEnv){btnEnv.disabled=false;btnEnv.textContent='📤 Enviar justificación';}
 }
 
+
+async function editarJustificacion(id) {
+  const j = _justificacionesCache.find(x=>x.id===id);
+  if (!j) { notif('❌ Justificación no encontrada','error'); return; }
+  document.getElementById('editJustifId').value = id;
+  document.getElementById('editJustifInfo').textContent = `Estudiante: ${j.nombre} — ${j.grado} Sección ${j.seccion} — ${j.fecha}`;
+  document.getElementById('editJustifMotivo').value = j.motivo || 'otro';
+  document.getElementById('editJustifDetalle').value = j.detalle || '';
+  document.getElementById('editJustifEstado').value = j.estado || 'pendiente';
+  document.getElementById('modalEditarJustif').classList.add('open');
+}
+
+async function guardarEdicionJustif() {
+  const id = document.getElementById('editJustifId').value;
+  const motivo = document.getElementById('editJustifMotivo').value;
+  const detalle = document.getElementById('editJustifDetalle').value.trim();
+  const estado = document.getElementById('editJustifEstado').value;
+  const btn = document.querySelector('#modalEditarJustif .btn-primary');
+  if (btn) { btn.disabled=true; btn.textContent='⏳ Guardando...'; }
+  try {
+    await fsUpdate('justificaciones', id, { motivo, detalle, estado });
+    notif('✅ Justificación actualizada','success');
+    document.getElementById('modalEditarJustif').classList.remove('open');
+    renderJustificaciones();
+    renderAlertasBadge();
+    actualizarStats();
+  } catch(err) {
+    notif('❌ Error: '+err.message,'error');
+  }
+  if (btn) { btn.disabled=false; btn.textContent='💾 Guardar cambios'; }
+}
+
 async function renderJustificaciones() {
   let justifs=await fsGetAll('justificaciones');
   _justificacionesCache=justifs;
@@ -1932,7 +2046,10 @@ async function renderJustificaciones() {
         <div><div class="justif-nombre">${j.nombre}</div><div class="justif-sub">${j.grado} — Sección ${j.seccion} · ${j.fecha} ${j.hora}</div></div>
         <div style="display:flex;align-items:center;gap:6px;">
           ${estadoBadge[j.estado]||''}
-          ${sesion?.rol==='admin'?`<button class="btn btn-sm" style="background:#e74c3c;color:white;padding:3px 8px;font-size:11px;" onclick="eliminarJustificacion('${j.id}')">🗑</button>`:''}
+          ${sesion?.rol==='admin'?`
+            <button class="btn btn-sm" style="background:#2980b9;color:white;padding:3px 8px;font-size:11px;" onclick="editarJustificacion('${j.id}')">✏️</button>
+            <button class="btn btn-sm" style="background:#e74c3c;color:white;padding:3px 8px;font-size:11px;" onclick="eliminarJustificacion('${j.id}')">🗑</button>
+          `:''}
         </div>
       </div>
       <div class="justif-motivo"><strong>${motLabels[j.motivo]||j.motivo}</strong>${j.detalle?'<br><span style="color:var(--texto-suave);">'+j.detalle+'</span>':''}</div>
@@ -2134,6 +2251,44 @@ async function exportarPDF() {
     <div style="display:flex;gap:10px;margin-top:4px;">
       <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="guardarEdicionEstudiante()">💾 Guardar cambios</button>
       <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="document.getElementById('modalEditarEst').classList.remove('open')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MODAL EDITAR JUSTIFICACIÓN ══ -->
+<div id="modalEditarJustif" class="modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">✏️ Editar Justificación</span>
+      <button class="modal-close" onclick="document.getElementById('modalEditarJustif').classList.remove('open')">✕</button>
+    </div>
+    <input type="hidden" id="editJustifId">
+    <div id="editJustifInfo" style="font-weight:700;font-size:13px;color:var(--texto-suave);margin-bottom:12px;"></div>
+    <div class="form-group">
+      <label>Motivo</label>
+      <select id="editJustifMotivo">
+        <option value="enfermedad">🤒 Enfermedad</option>
+        <option value="cita">🏥 Cita médica</option>
+        <option value="familiar">👨‍👩‍👧 Motivo familiar</option>
+        <option value="otro">📝 Otro motivo</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Descripción</label>
+      <textarea id="editJustifDetalle" rows="3" style="resize:none;padding:9px 12px;border:1.5px solid var(--borde);border-radius:8px;font-family:inherit;font-size:13px;outline:none;width:100%;"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Estado</label>
+      <select id="editJustifEstado">
+        <option value="pendiente">⏳ Pendiente</option>
+        <option value="aprobado">✅ Aprobado</option>
+        <option value="rechazado">❌ Rechazado</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:4px;">
+      <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="guardarEdicionJustif()">💾 Guardar cambios</button>
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="document.getElementById('modalEditarJustif').classList.remove('open')">Cancelar</button>
     </div>
   </div>
 </div>
@@ -2418,6 +2573,44 @@ window.onload=init;
     <div style="display:flex;gap:10px;margin-top:4px;">
       <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="guardarEdicionEstudiante()">💾 Guardar cambios</button>
       <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="document.getElementById('modalEditarEst').classList.remove('open')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MODAL EDITAR JUSTIFICACIÓN ══ -->
+<div id="modalEditarJustif" class="modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">✏️ Editar Justificación</span>
+      <button class="modal-close" onclick="document.getElementById('modalEditarJustif').classList.remove('open')">✕</button>
+    </div>
+    <input type="hidden" id="editJustifId">
+    <div id="editJustifInfo" style="font-weight:700;font-size:13px;color:var(--texto-suave);margin-bottom:12px;"></div>
+    <div class="form-group">
+      <label>Motivo</label>
+      <select id="editJustifMotivo">
+        <option value="enfermedad">🤒 Enfermedad</option>
+        <option value="cita">🏥 Cita médica</option>
+        <option value="familiar">👨‍👩‍👧 Motivo familiar</option>
+        <option value="otro">📝 Otro motivo</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Descripción</label>
+      <textarea id="editJustifDetalle" rows="3" style="resize:none;padding:9px 12px;border:1.5px solid var(--borde);border-radius:8px;font-family:inherit;font-size:13px;outline:none;width:100%;"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Estado</label>
+      <select id="editJustifEstado">
+        <option value="pendiente">⏳ Pendiente</option>
+        <option value="aprobado">✅ Aprobado</option>
+        <option value="rechazado">❌ Rechazado</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:4px;">
+      <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="guardarEdicionJustif()">💾 Guardar cambios</button>
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="document.getElementById('modalEditarJustif').classList.remove('open')">Cancelar</button>
     </div>
   </div>
 </div>
