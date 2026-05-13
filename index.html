@@ -335,6 +335,7 @@ td{padding:9px 11px;border-bottom:1px solid var(--borde);color:var(--texto);}
 tr:last-child td{border-bottom:none;}
 tr.row-presente{background:#f4f4f6;}
 tr.row-ausente{background:#ececee;}
+tr.row-tardanza{background:#fef9ec;}
 tr.row-justificado{background:#eaf4fb;}
 tr.row-alerta{background:#ececee;border-left:3px solid var(--rojo);}
 
@@ -562,6 +563,7 @@ tr.row-alerta{background:#ececee;border-left:3px solid var(--rojo);}
           <div class="stat-box"><div class="stat-num" id="statPresentes">—</div><div class="stat-lbl">Presentes hoy</div></div>
           <div class="stat-box red"><div class="stat-num" id="statAusentes">—</div><div class="stat-lbl">Ausentes</div></div>
           <div class="stat-box amber"><div class="stat-num" id="statPct">—</div><div class="stat-lbl">% Asistencia</div></div>
+          <div class="stat-box" style="border-top:3px solid #f39c12;"><div class="stat-num" id="statTardanzas">0</div><div class="stat-lbl">Tardanzas hoy</div></div>
           <div class="stat-box blue"><div class="stat-num" id="statJustif">0</div><div class="stat-lbl">Justif. pendientes</div></div>
         </div>
 
@@ -578,7 +580,7 @@ tr.row-alerta{background:#ececee;border-left:3px solid var(--rojo);}
           <div class="form-grid">
             <div class="form-group full"><label>Nombre completo *</label><input type="text" id="sNombre" placeholder="Apellidos y nombres"></div>
             <div class="form-group"><label>Grado *</label>
-              <select id="sGrado"><option>1ro</option><option>2do</option><option>3ro</option><option>4to</option><option>5to</option></select>
+              <select id="sGrado"><option>1ro</option><option>2do</option><option>3ro</option><option>4to</option><option>5to</option><option>6to</option></select>
             </div>
             <div class="form-group"><label>Sección *</label>
               <select id="sSeccion"><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option></select>
@@ -595,7 +597,7 @@ tr.row-alerta{background:#ececee;border-left:3px solid var(--rojo);}
             <button class="btn btn-sm" style="background:#8b1a1a;color:white;" onclick="imprimirQR()">🖨 Imprimir QR</button>
           </div>
           <div class="filters">
-            <select id="fGradoAdmin" onchange="renderEstudiantes()"><option value="">Todos los grados</option><option value="1ro">1ro</option><option value="2do">2do</option><option value="3ro">3ro</option><option value="4to">4to</option><option value="5to">5to</option></select>
+            <select id="fGradoAdmin" onchange="renderEstudiantes()"><option value="">Todos los grados</option><option value="1ro">1ro</option><option value="2do">2do</option><option value="3ro">3ro</option><option value="4to">4to</option><option value="5to">5to</option><option value="6to">6to</option></select>
             <select id="fSecAdmin" onchange="renderEstudiantes()"><option value="">Todas las secciones</option><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option></select>
           </div>
           <div id="listaEstudiantes" class="students-grid"></div>
@@ -632,7 +634,7 @@ tr.row-alerta{background:#ececee;border-left:3px solid var(--rojo);}
           <div class="card-header">
             <span class="card-title">📋 Estado de Asistencia — Hoy</span>
             <div class="filters" style="margin:0;">
-              <select id="fGradoAux"><option value="">Todos</option><option value="1ro">1ro</option><option value="2do">2do</option><option value="3ro">3ro</option><option value="4to">4to</option><option value="5to">5to</option></select>
+              <select id="fGradoAux"><option value="">Todos</option><option value="1ro">1ro</option><option value="2do">2do</option><option value="3ro">3ro</option><option value="4to">4to</option><option value="5to">5to</option><option value="6to">6to</option></select>
               <select id="fSecAux"><option value="">Todas</option><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option></select>
               <button class="btn btn-primary btn-sm" onclick="renderListaAsistencia()">🔍 Buscar</button>
             </div>
@@ -656,7 +658,7 @@ tr.row-alerta{background:#ececee;border-left:3px solid var(--rojo);}
             <span class="card-title">📄 Justificaciones de Inasistencia</span><div style="display:flex;gap:8px;"><button class="btn btn-sm" style="background:#6b1212;color:white;" onclick="exportarJustificacionesExcel()">📊 Excel</button><button class="btn btn-sm" style="background:#c0392b;color:white;" onclick="eliminarJustificacionesFiltradas()">🗑 Eliminar filtradas</button></div>
             <div class="filters" style="margin:0;">
               <select id="fJustifEstado" onchange="renderJustificaciones()"><option value="">Todos los estados</option><option value="pendiente">⏳ Pendiente</option><option value="aprobado">✅ Aprobado</option><option value="rechazado">❌ Rechazado</option><option value="alerta">🚨 Alerta</option></select>
-              <select id="fJustifGrado" onchange="renderJustificaciones()"><option value="">Todos los grados</option><option value="1ro">1ro</option><option value="2do">2do</option><option value="3ro">3ro</option><option value="4to">4to</option><option value="5to">5to</option></select>
+              <select id="fJustifGrado" onchange="renderJustificaciones()"><option value="">Todos los grados</option><option value="1ro">1ro</option><option value="2do">2do</option><option value="3ro">3ro</option><option value="4to">4to</option><option value="5to">5to</option><option value="6to">6to</option></select>
             </div>
           </div>
           <div id="listaJustificaciones"></div>
@@ -668,7 +670,7 @@ tr.row-alerta{background:#ececee;border-left:3px solid var(--rojo);}
         <div class="card">
           <div class="card-header"><span class="card-title">📊 Reportes y Exportación</span></div>
           <div class="filters">
-            <select id="rGrado"><option value="">Todos los grados</option><option value="1ro">1ro</option><option value="2do">2do</option><option value="3ro">3ro</option><option value="4to">4to</option><option value="5to">5to</option></select>
+            <select id="rGrado"><option value="">Todos los grados</option><option value="1ro">1ro</option><option value="2do">2do</option><option value="3ro">3ro</option><option value="4to">4to</option><option value="5to">5to</option><option value="6to">6to</option></select>
             <select id="rSeccion"><option value="">Todas las secciones</option><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option></select>
             <input type="date" id="rFechaInicio" style="padding:7px 10px;border:1.5px solid var(--borde);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:12px;outline:none;">
             <input type="date" id="rFechaFin" style="padding:7px 10px;border:1.5px solid var(--borde);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:12px;outline:none;">
@@ -795,7 +797,7 @@ tr.row-alerta{background:#ececee;border-left:3px solid var(--rojo);}
         <div class="form-group">
           <label>Grados asignados (Ctrl+clic = múltiples)</label>
           <select id="uGrados" multiple size="5" style="padding:6px;border:1.5px solid var(--borde);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;outline:none;width:100%;">
-            <option value="1ro">1ro Secundaria</option><option value="2do">2do Secundaria</option><option value="3ro">3ro Secundaria</option><option value="4to">4to Secundaria</option><option value="5to">5to Secundaria</option>
+            <option value="1ro">1ro Primaria</option><option value="2do">2do Primaria</option><option value="3ro">3ro Primaria</option><option value="4to">4to Primaria</option><option value="5to">5to Primaria</option><option value="6to">6to Primaria</option>
           </select>
           <small style="color:var(--texto-suave);font-size:10px;">Sin selección = todos los grados</small>
         </div>
@@ -894,7 +896,7 @@ tr.row-alerta{background:#ececee;border-left:3px solid var(--rojo);}
           <label style="font-size:11px;font-weight:600;color:var(--texto-suave);display:block;margin-bottom:4px;">GRADO</label>
           <select class="input" id="editEstGrado">
             <option value="1ro">1ro</option><option value="2do">2do</option><option value="3ro">3ro</option>
-            <option value="4to">4to</option><option value="5to">5to</option>
+            <option value="4to">4to</option><option value="5to">5to</option><option value="6to">6to</option>
           </select>
         </div>
         <div>
@@ -1371,7 +1373,7 @@ async function abrirEditarEstudiante(id) {
   if (!e) { notif('❌ Estudiante no encontrado','error'); return; }
   document.getElementById('editEstId').value = id;
   document.getElementById('editEstNombre').value = e.nombre || '';
-  document.getElementById('editEstGrado').value = e.grado || '1°';
+  document.getElementById('editEstGrado').value = e.grado || '1ro';
   document.getElementById('editEstSeccion').value = e.seccion || 'A';
   document.getElementById('editEstDNI').value = e.dniPadre || '';
   document.getElementById('editEstTelefono').value = e.telefono || '';
@@ -1437,7 +1439,7 @@ async function descargarQR(id) {
   let nombre=e.nombre; if(ctx.measureText(nombre).width>W-40) nombre=nombre.split(' ').slice(0,3).join(' ');
   ctx.fillText(nombre, W/2, 338);
   ctx.font='bold 13px Arial'; ctx.fillStyle='#6b1212';
-  ctx.fillText(e.grado+' Secundaria  ·  Sección '+e.seccion, W/2, 360);
+  ctx.fillText(e.grado+' Primaria  ·  Sección '+e.seccion, W/2, 360);
   ctx.fillStyle='#4a1010'; ctx.fillRect(0,375,W,25);
   ctx.font='9px Arial'; ctx.fillStyle='rgba(255,255,255,.5)';
   ctx.fillText('No compartir — Solo uso interno del colegio', W/2, 389);
@@ -1490,7 +1492,7 @@ async function imprimirQR() {
   }
   const rows = filtrada.map(e=>{
     const qrSrc = qrMap[e.id] || '';
-    return `<div class="tarjeta"><div class="hdr"><div class="colegio">IE N.° 0162 SAN JOSÉ OBRERO<br>SAN JOSÉ OBRERO</div><div class="sub">Tarjeta de Asistencia</div></div><div class="qr-wrap"><img src="${qrSrc}" width="130" height="130"></div><div class="sep"></div><div class="id-txt">ID: ${e.id.substring(0,8)}</div><div class="nombre">${e.nombre}</div><div class="grado">${e.grado} Sec. · Sección ${e.seccion}</div><div class="ftr">IE N.° 0162 SAN JOSÉ OBRERO — Uso interno</div></div>`;
+    return `<div class="tarjeta"><div class="hdr"><div class="colegio">IE N.° 0162 SAN JOSÉ OBRERO<br>SAN JOSÉ OBRERO</div><div class="sub">Tarjeta de Asistencia</div></div><div class="qr-wrap"><img src="${qrSrc}" width="130" height="130"></div><div class="sep"></div><div class="id-txt">ID: ${e.id.substring(0,8)}</div><div class="nombre">${e.nombre}</div><div class="grado">${e.grado} Prim. · Sección ${e.seccion}</div><div class="ftr">IE N.° 0162 SAN JOSÉ OBRERO — Uso interno</div></div>`;
   }).join('');
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;background:white;padding:10px;}.grid{display:flex;flex-wrap:wrap;gap:8px;}.tarjeta{width:200px;border-radius:12px;overflow:hidden;border:1px solid #d4ddd6;background:white;page-break-inside:avoid;}.hdr{background:#4a1010;color:white;padding:10px;text-align:center;border-bottom:4px solid #8b1a1a;}.colegio{font-size:7.5px;font-weight:bold;line-height:1.4;}.sub{font-size:8px;opacity:.7;margin-top:2px;}.qr-wrap{padding:12px;text-align:center;background:#f8f9f8;}.sep{height:1px;background:#e0e6e1;margin:0 12px;}.id-txt{font-size:9px;color:#9aaa9d;text-align:center;padding:6px 0 2px;font-family:monospace;}.nombre{font-size:12px;font-weight:bold;text-align:center;padding:2px 8px;color:#2c2020;}.grado{font-size:10px;font-weight:bold;color:#6b1212;text-align:center;padding:2px 0 8px;}.ftr{background:#4a1010;color:rgba(255,255,255,.4);font-size:7px;text-align:center;padding:5px;}@media print{body{padding:0;}}</style></head><body><div class="grid">${rows}</div>
 </body></html>`;
@@ -1501,7 +1503,10 @@ async function imprimirQR() {
     const blob = new Blob([html], {type:'text/html'});
     const a = w.document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'boleta_justificacion_' + (j?.nombre||'estudiante').replace(/\s+/g,'_') + '.html';
+    const _gf2 = document.getElementById('fGradoAdmin')?.value || 'todos';
+    const _sf2 = document.getElementById('fSecAdmin')?.value || 'todas';
+    const _fecha2 = new Date().toISOString().slice(0,10);
+    a.download = 'tarjetas_qr_' + _gf2 + '_sec' + _sf2 + '_' + _fecha2 + '.html';
     w.document.body.appendChild(a);
     a.click();
     setTimeout(()=>w.close(),500);
@@ -1532,8 +1537,28 @@ async function registrarAsistencia(qrData) {
     const existente = await fsQuery('asistencia', FB.where('estudianteId','==',estudianteId), FB.where('fecha','==',fecha));
     if (existente.length) { notif(`⚠️ ${nombre} ya fue registrado hoy`,'warning'); return false; }
     const hora = new Date().toLocaleTimeString('es-PE');
-    await fsAdd('asistencia',{ estudianteId, nombre, grado, seccion, fecha, hora, estado:'presente', registradoPor: sesion?.uid||'padre' });
-    notif(`✅ ${nombre} — ${grado} "${seccion}" — ${hora}`,'success');
+    // Determinar estado según hora de llegada
+    const ahora = new Date();
+    const hh = ahora.getHours();
+    const mm = ahora.getMinutes();
+    const totalMin = hh * 60 + mm;
+    const t745 = 7 * 60 + 45;
+    const t800 = 8 * 60 + 0;
+    const t810 = 8 * 60 + 10;
+    let estado;
+    if (totalMin <= t800) {
+      // Antes de o exactamente a las 08:00 → puntual (incluye llegadas muy tempranas)
+      estado = 'puntual';
+    } else if (totalMin > t800 && totalMin <= t810) {
+      // Entre 08:01 y 08:10 → tardanza leve
+      estado = 'tardanza';
+    } else {
+      // Después de las 08:10 → tardanza (llegó tarde pero llegó; ausente solo por cierre de sesión o registro manual)
+      estado = 'tardanza';
+    }
+    await fsAdd('asistencia',{ estudianteId, nombre, grado, seccion, fecha, hora, estado, registradoPor: sesion?.uid||'padre' });
+    const estadoEmoji = estado === 'puntual' ? '✅ PUNTUAL' : estado === 'tardanza' ? '⏰ TARDANZA' : '❌ AUSENTE';
+    notif(`${estadoEmoji} — ${nombre} — ${grado} "${seccion}" — ${hora}`,'success');
     renderListaAsistencia(); cargarTablaAsistencia(); actualizarStats();
     return true;
   } catch(err) {
@@ -1604,7 +1629,9 @@ async function cargarTablaAsistencia() {
   asist.sort((a,b)=>a.hora<b.hora?1:-1);
   tbody.innerHTML = asist.map(a=>{
     const esAusente=a.estado==='ausente';
-    return `<tr class="${esAusente?'row-ausente':'row-presente'}"><td>${a.nombre||a.estudianteId}</td><td>${a.grado||'—'}</td><td>${a.seccion||'—'}</td><td>${a.hora}</td><td>${esAusente?'<span class="badge badge-red">❌ Ausente</span>':'<span class="badge badge-green">✅ Presente</span>'}</td></tr>`;
+    const esTardanza=a.estado==='tardanza';
+    const badgeEstado = esAusente ? '<span class="badge badge-red">❌ Ausente</span>' : esTardanza ? '<span class="badge" style="background:#f39c12;color:#fff;">⏰ Tardanza</span>' : '<span class="badge badge-green">✅ Puntual</span>';
+    return `<tr class="${esAusente?'row-ausente':esTardanza?'row-tardanza':'row-presente'}"><td>${a.nombre||a.estudianteId}</td><td>${a.grado||'—'}</td><td>${a.seccion||'—'}</td><td>${a.hora}</td><td>${badgeEstado}</td></tr>`;
   }).join('');
 }
 
@@ -1775,7 +1802,7 @@ async function enviarJustificacion() {
   // BUG #6 FIX: verificar que no esté ya marcado presente antes de guardar la justificación
   if(motivoSel!=='alerta'){
     const asistHoy=await fsQuery('asistencia',FB.where('estudianteId','==',justifEstudianteId),FB.where('fecha','==',fecha));
-    if(asistHoy.length&&asistHoy[0].estado==='presente'){
+    if(asistHoy.length&&(asistHoy[0].estado==='puntual'||asistHoy[0].estado==='tardanza')){
       notif('ℹ️ El estudiante ya está marcado como PRESENTE hoy. No se puede justificar.','warning');
       document.getElementById('modalJustif').classList.remove('open');
       return;
@@ -1917,13 +1944,14 @@ async function actualizarStats() {
     const asist = _asistenciaHoyCache?.length ? _asistenciaHoyCache : await fsQuery('asistencia',FB.where('fecha','==',getFecha()));
     if (!_asistenciaHoyCache?.length) _asistenciaHoyCache = asist;
     const presSet=new Set(asist.filter(a=>a.estado!=='ausente').map(a=>a.estudianteId));
+    const tardanzaCount=asist.filter(a=>a.estado==='tardanza').length;
     const justifs = _justificacionesCache?.length ? _justificacionesCache : await fsGetAll('justificaciones');
     if (!_justificacionesCache?.length) _justificacionesCache = justifs;
     const pendientes=justifs.filter(j=>j.estado==='pendiente'||j.estado==='alerta').length;
     const total=todos.length, presentes=[...presSet].filter(id=>todos.find(e=>e.id===id)).length;
     const ausentes=total-presentes, pct=total?Math.round(presentes/total*100):0;
     const s=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
-    s('statTotal',total);s('statPresentes',presentes);s('statAusentes',ausentes);s('statPct',pct+'%');s('statJustif',pendientes);
+    s('statTotal',total);s('statPresentes',presentes);s('statAusentes',ausentes);s('statPct',pct+'%');s('statJustif',pendientes);s('statTardanzas',tardanzaCount);
   } catch(e) { console.error('Stats error',e); }
 }
 
@@ -1957,7 +1985,9 @@ async function generarReporte() {
       const e=estudiantes.find(x=>x.id===a.estudianteId); if(!e) return '';
       const j=justifs.find(x=>x.estudianteId===a.estudianteId&&x.fecha===a.fecha);
       const esAusente=a.estado==='ausente';
-      return `<tr class="${esAusente?'row-ausente':'row-presente'}"><td>${e.nombre}</td><td>${e.grado}</td><td>${e.seccion}</td><td>${a.fecha}</td><td>${esAusente?'<span class="badge badge-red">❌ Ausente</span>':'<span class="badge badge-green">✅ Presente</span>'}</td><td>${j?j.motivo:'—'}</td></tr>`;
+      const esTardanza=a.estado==='tardanza';
+      const badgeRep = esAusente ? '<span class="badge badge-red">❌ Ausente</span>' : esTardanza ? '<span class="badge" style="background:#f39c12;color:#fff;">⏰ Tardanza</span>' : '<span class="badge badge-green">✅ Puntual</span>';
+      return `<tr class="${esAusente?'row-ausente':esTardanza?'row-tardanza':'row-presente'}"><td>${e.nombre}</td><td>${e.grado}</td><td>${e.seccion}</td><td>${a.fecha}</td><td>${badgeRep}</td><td>${j?j.motivo:'—'}</td></tr>`;
     }).join('')||'<tr><td colspan="6" style="text-align:center;padding:18px;color:var(--texto-suave);">Sin datos</td></tr>';
   }
   const fechasUnicas=[...new Set(asistFilt.map(a=>a.fecha))].slice(-7);
