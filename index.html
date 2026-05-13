@@ -1098,7 +1098,7 @@ async function hacerLoginPadre() {
   btn.disabled = true; btn.textContent = '⏳ Verificando…';
   try {
     // Obtener custom token desde la Cloud Function
-    const resp = await fetch('https://TU_REGION-TU_PROYECTO.cloudfunctions.net/loginPadre', {
+    const resp = await fetch('https://loginpadre-ufpmxbq7da-uc.a.run.app', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ dni })
@@ -1652,7 +1652,7 @@ async function consultarPadre() {
   if(!/^(\d{8}|[A-Za-z0-9]{9,12})$/.test(dni)){notif('❌ DNI o carnet de extranjería inválido','error');return;}
   try {
     // Obtener custom token desde la Cloud Function
-    const resp = await fetch('https://TU_REGION-TU_PROYECTO.cloudfunctions.net/loginPadre', {
+    const resp = await fetch('https://loginpadre-ufpmxbq7da-uc.a.run.app', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ dni })
