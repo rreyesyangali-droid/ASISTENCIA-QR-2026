@@ -5,6 +5,29 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>AsistenciaQR — IE N.° 0162 SAN JOSÉ OBRERO - UGEL 05 - SJL</title>
 
+<!-- ══ CONTENT SECURITY POLICY ══ -->
+<!--
+  'unsafe-inline' en script-src y style-src es necesario porque la app usa:
+  - Scripts inline (lógica principal, manifest blob, botón instalar)
+  - Estilos inline en muchos elementos del HTML
+  - URL.createObjectURL (blob:) para reportes, boletas y manifest PWA
+  Si en el futuro se separa el JS a archivos externos, se puede eliminar 'unsafe-inline'.
+-->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src  'self' 'unsafe-inline' cdn.jsdelivr.net www.gstatic.com;
+  style-src   'self' 'unsafe-inline' fonts.googleapis.com;
+  font-src    fonts.gstatic.com;
+  connect-src 'self'
+              https://*.googleapis.com
+              https://*.firebaseio.com
+              https://*.firebasestorage.app
+              https://firebaseapp.com
+              https://*.a.run.app;
+  img-src     'self' data: blob:;
+  worker-src  blob:;
+">
+
 <!-- ══ PWA META TAGS ══ -->
 <meta name="application-name" content="AsistenciaQR">
 <meta name="description" content="Sistema de control de asistencia IE N.° 0162 SAN JOSÉ OBRERO">
@@ -35,16 +58,16 @@
     lang: "es",
     icons: [
       {
-        src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='38' fill='%23e8000d'/><text y='.85em' font-size='140' x='20'>📚</text></svg>",
+        src: "./logo.jpeg",
         sizes: "192x192",
-        type: "image/svg+xml",
-        purpose: "any maskable"
+        type: "image/jpeg",
+        purpose: "any"
       },
       {
-        src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%23e8000d'/><text y='.85em' font-size='380' x='56'>📚</text></svg>",
+        src: "./logo.jpeg",
         sizes: "512x512",
-        type: "image/svg+xml",
-        purpose: "any maskable"
+        type: "image/jpeg",
+        purpose: "any"
       }
     ],
     categories: ["education", "productivity"],
@@ -60,59 +83,20 @@
 </script>
 
 <!-- ══ SERVICE WORKER (caché offline) ══ -->
+<!-- ⚠️ IMPORTANTE: el Service Worker debe estar en un archivo físico separado (sw.js).
+     Un SW registrado desde un Blob URL no puede interceptar las peticiones reales
+     de la app porque su scope queda limitado a blob://, rompiendo el modo offline.
+     Copia el contenido de sw.js (incluido en este paquete) a la raíz de tu servidor. -->
 <script>
 if ('serviceWorker' in navigator) {
-  const swCode = `
-    const CACHE = 'asistencia-qr-0162-v1';
-    const ASSETS = [self.location.pathname];
-
-    self.addEventListener('install', e => {
-      e.waitUntil(
-        caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting())
-      );
-    });
-
-    self.addEventListener('activate', e => {
-      e.waitUntil(
-        caches.keys().then(keys =>
-          Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-        ).then(() => self.clients.claim())
-      );
-    });
-
-    self.addEventListener('fetch', e => {
-      if (e.request.method !== 'GET') return;
-      // Firebase y CDN siempre desde red
-      const url = e.request.url;
-      if (url.includes('firebasejs') || url.includes('googleapis') ||
-          url.includes('gstatic') || url.includes('firebaseio') ||
-          url.includes('googleapis') || url.includes('jsdelivr') ||
-          url.includes('fonts.')) {
-        e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
-        return;
-      }
-      // App shell: red primero, caché como respaldo
-      e.respondWith(
-        fetch(e.request)
-          .then(res => {
-            const clone = res.clone();
-            caches.open(CACHE).then(c => c.put(e.request, clone));
-            return res;
-          })
-          .catch(() => caches.match(e.request))
-      );
-    });
-  `;
-  const swBlob = new Blob([swCode], {type: 'application/javascript'});
-  const swUrl  = URL.createObjectURL(swBlob);
-  navigator.serviceWorker.register(swUrl, {scope: './'})
+  navigator.serviceWorker.register('./sw.js', { scope: './' })
     .then(reg => {
       console.log('✅ Service Worker registrado:', reg.scope);
       reg.addEventListener('updatefound', () => {
         const newWorker = reg.installing;
         newWorker.addEventListener('statechange', () => {
           if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            console.log('🔄 Nueva versión disponible');
+            console.log('🔄 Nueva versión disponible — recarga para actualizar');
           }
         });
       });
@@ -162,6 +146,19 @@ import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, si
 import { getFirestore, collection, doc, addDoc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
+// ══════════════════════════════════════════════════════════════════
+// 🔐 SEGURIDAD — API KEY DE FIREBASE
+// ══════════════════════════════════════════════════════════════════
+// El API key de Firebase es PÚBLICO por diseño (se envía al navegador),
+// pero DEBES restringirlo para que solo funcione desde tu dominio:
+//
+// PASO OBLIGATORIO → Google Cloud Console → APIs y servicios → Credenciales
+//   → Selecciona la clave "Browser key (auto created by Firebase)"
+//   → Restricciones de aplicación → Sitios web HTTP
+//   → Agrega: https://TU-DOMINIO.web.app y https://TU-DOMINIO.firebaseapp.com
+//
+// Sin esa restricción cualquier persona puede usar tu cuota de Firebase.
+// ══════════════════════════════════════════════════════════════════
 const firebaseConfig = {
   apiKey: "AIzaSyDY0v6PpaH1UCQl6-oIMk4l8UPSKTLdIeo",
   authDomain: "registro-asistencia-qr-2026.firebaseapp.com",
@@ -176,16 +173,16 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-window._fb = { auth, db, collection, doc, addDoc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously, signInWithCustomToken };
-window._fbReady = true;
-// Disparar el evento y también llamar directamente si el listener ya está listo
-document.dispatchEvent(new Event('fbready'));
-if (window._iniciarApp) window._iniciarApp(window._fb);
+// Objeto interno — nunca se expone en window
+const _fbInterno = { auth, db, collection, doc, addDoc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously, signInWithCustomToken };
+
+// Llamada directa desde el módulo ES — sin pasar por window._fb
+if (window._iniciarApp) window._iniciarApp(_fbInterno);
 </script>
 
 <style>
 :root {
-  --verde:#8b1a1a; --verde-oscuro:#6b1212; --verde-claro:#a52320;
+  --primario:#8b1a1a; --primario-oscuro:#6b1212; --primario-claro:#a52320;
   --naranja:#e67e22; --rojo:#8b1a1a; --azul:#2980b9; --morado:#8e44ad;
   --gris-bg:#f4f4f6; --blanco:#fff; --texto:#2c2c2c; --texto-suave:#6c757d;
   --borde:#dee2e6;
@@ -207,27 +204,27 @@ body{font-family:'DM Sans',sans-serif;background:var(--gris-bg);min-height:100vh
 #loginScreen{position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#5a1010,#6b1212,#8b1a1a);display:none;align-items:center;justify-content:center;padding:20px;}
 .login-card{background:white;border-radius:20px;padding:36px;width:100%;max-width:400px;box-shadow:0 24px 80px rgba(0,0,0,.35);}
 .login-logo{text-align:center;margin-bottom:24px;}
-.login-logo-icon{width:60px;height:60px;background:var(--verde);border-radius:14px;display:inline-flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:10px;box-shadow:0 8px 24px rgba(192,57,43,.4);}
+.login-logo-icon{width:60px;height:60px;background:var(--primario);border-radius:14px;display:inline-flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:10px;box-shadow:0 8px 24px rgba(192,57,43,.4);}
 .login-logo h1{font-size:17px;font-weight:700;}
 .login-logo p{font-size:11px;color:var(--texto-suave);margin-top:2px;}
 .role-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px;}
 .role-pill{padding:10px 6px;border:2px solid var(--borde);border-radius:10px;background:transparent;cursor:pointer;text-align:center;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;color:var(--texto-suave);transition:all .2s;}
 .role-pill .rp-icon{display:block;font-size:22px;margin-bottom:4px;}
-.role-pill:hover{border-color:var(--verde);color:var(--verde);}
-.role-pill.sel{border-color:var(--verde);background:#f4f4f6;color:var(--verde);}
+.role-pill:hover{border-color:var(--primario);color:var(--primario);}
+.role-pill.sel{border-color:var(--primario);background:#f4f4f6;color:var(--primario);}
 .lin{width:100%;padding:12px 14px;border:1.5px solid var(--borde);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--texto);outline:none;margin-bottom:10px;transition:border-color .2s;}
-.lin:focus{border-color:var(--verde);}
-.login-btn{width:100%;padding:13px;background:var(--verde);color:white;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:background .2s;}
-.login-btn:hover{background:var(--verde-oscuro);}
+.lin:focus{border-color:var(--primario);}
+.login-btn{width:100%;padding:13px;background:var(--primario);color:white;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:background .2s;}
+.login-btn:hover{background:var(--primario-oscuro);}
 .login-btn:disabled{background:#aaa;cursor:not-allowed;}
 .login-err{background:#ececee;border:1px solid var(--rojo);border-radius:8px;padding:10px 14px;font-size:13px;color:#6b1212;margin-bottom:10px;display:none;}
 .login-hint{margin-top:14px;padding:11px;background:#f4f4f6;border-radius:8px;font-size:11px;color:#6b1212;line-height:1.6;}
 
 /* ── LAYOUT ── */
 .layout{display:flex;min-height:100vh;}
-.sidebar{width:240px;background:var(--verde-oscuro);display:flex;flex-direction:column;padding:24px 14px;position:sticky;top:0;height:100vh;flex-shrink:0;overflow-y:auto;}
+.sidebar{width:240px;background:var(--primario-oscuro);display:flex;flex-direction:column;padding:24px 14px;position:sticky;top:0;height:100vh;flex-shrink:0;overflow-y:auto;}
 .logo{display:flex;align-items:center;gap:10px;padding:0 8px 22px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:20px;}
-.logo-icon{width:36px;height:36px;background:var(--verde-claro);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.logo-icon{width:36px;height:36px;background:var(--primario-claro);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;}
 .logo-text{color:white;font-size:12px;font-weight:700;line-height:1.3;}
 .logo-sub{color:rgba(255,255,255,.4);font-size:10px;}
 .nav-lbl{color:rgba(255,255,255,.3);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:0 10px;margin:16px 0 6px;}
@@ -256,7 +253,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--gris-bg);min-height:100vh
 .timer-status-txt{color:white;font-weight:600;font-size:14px;margin-bottom:2px;}
 .progress-wrap{flex:1;min-width:160px;}
 .progress-bar{height:7px;background:rgba(255,255,255,.15);border-radius:99px;overflow:hidden;margin-bottom:5px;}
-.progress-fill{height:100%;background:var(--verde-claro);border-radius:99px;transition:width 1s linear;}
+.progress-fill{height:100%;background:var(--primario-claro);border-radius:99px;transition:width 1s linear;}
 .progress-label{color:rgba(255,255,255,.55);font-size:11px;}
 .timer-actions{display:flex;gap:8px;margin-left:auto;}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
@@ -273,7 +270,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--gris-bg);min-height:100vh
 /* ── STATS ── */
 .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:18px;}
 .stat-box{background:white;border:1px solid var(--borde);border-radius:var(--radius-sm);padding:14px;text-align:center;}
-.stat-num{font-family:'Space Mono',monospace;font-size:1.9em;font-weight:700;color:var(--verde);}
+.stat-num{font-family:'Space Mono',monospace;font-size:1.9em;font-weight:700;color:var(--primario);}
 .stat-lbl{font-size:10px;color:var(--texto-suave);margin-top:3px;text-transform:uppercase;letter-spacing:.5px;}
 .stat-box.red .stat-num{color:var(--rojo);}
 .stat-box.amber .stat-num{color:var(--naranja);}
@@ -282,8 +279,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--gris-bg);min-height:100vh
 /* ── BUTTONS ── */
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;white-space:nowrap;}
 .btn:active{transform:scale(.97);}
-.btn-primary{background:var(--verde);color:white;}
-.btn-primary:hover{background:var(--verde-oscuro);}
+.btn-primary{background:var(--primario);color:white;}
+.btn-primary:hover{background:var(--primario-oscuro);}
 .btn-success{background:#8b1a1a;color:white;}
 .btn-success:hover{background:#6b1212;}
 .btn-danger{background:var(--rojo);color:white;}
@@ -293,7 +290,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--gris-bg);min-height:100vh
 .btn-azul:hover{background:#2471a3;}
 .btn-morado{background:var(--morado);color:white;}
 .btn-ghost{background:transparent;color:var(--texto-suave);border:1.5px solid var(--borde);}
-.btn-ghost:hover{border-color:var(--verde);color:var(--verde);}
+.btn-ghost:hover{border-color:var(--primario);color:var(--primario);}
 .btn-lg{padding:12px 22px;font-size:14px;width:100%;justify-content:center;}
 .btn-sm{padding:5px 11px;font-size:12px;}
 
@@ -302,7 +299,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--gris-bg);min-height:100vh
 .form-group{display:flex;flex-direction:column;gap:5px;}
 .form-group label{font-size:11px;font-weight:700;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.5px;}
 .form-group input,.form-group select,.form-group textarea{padding:9px 12px;border:1.5px solid var(--borde);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--texto);background:white;transition:border-color .2s;outline:none;}
-.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--verde);}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--primario);}
 .form-group.full{grid-column:1/-1;}
 
 /* ── STUDENTS GRID ── */
@@ -397,13 +394,13 @@ tr.row-alerta{background:#ececee;border-left:3px solid var(--rojo);}
 .motivo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0;}
 .motivo-btn{padding:12px 8px;border:2px solid var(--borde);border-radius:10px;background:transparent;cursor:pointer;text-align:center;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;color:var(--texto-suave);transition:all .2s;}
 .motivo-btn .m-icon{display:block;font-size:22px;margin-bottom:4px;}
-.motivo-btn:hover{border-color:var(--verde);color:var(--verde);}
-.motivo-btn.sel{border-color:var(--verde);background:#f4f4f6;color:var(--verde);}
+.motivo-btn:hover{border-color:var(--primario);color:var(--primario);}
+.motivo-btn.sel{border-color:var(--primario);background:#f4f4f6;color:var(--primario);}
 .motivo-btn.sel.alerta-sel{border-color:var(--rojo);background:#ececee;color:var(--rojo);}
 
 /* ── UPLOAD ZONE ── */
 .upload-zone{border:2px dashed var(--borde);border-radius:12px;padding:22px;text-align:center;cursor:pointer;transition:all .2s;background:var(--gris-bg);margin:10px 0;display:block;}
-.upload-zone:hover{border-color:var(--verde);background:#f4f4f6;}
+.upload-zone:hover{border-color:var(--primario);background:#f4f4f6;}
 .upload-preview{margin-top:10px;display:none;}
 .upload-preview img{max-width:100%;max-height:180px;border-radius:10px;border:2px solid var(--borde);object-fit:contain;}
 
@@ -434,9 +431,9 @@ tr.row-alerta{background:#ececee;border-left:3px solid var(--rojo);}
   .timer-actions{width:100%;}
   .timer-actions .btn{flex:1;justify-content:center;}
   .motivo-grid{grid-template-columns:repeat(3,1fr);}
-  .mobile-nav{display:flex!important;position:fixed;bottom:0;left:0;right:0;background:var(--verde-oscuro);z-index:100;padding:8px 0 env(safe-area-inset-bottom,8px);}
+  .mobile-nav{display:flex!important;position:fixed;bottom:0;left:0;right:0;background:var(--primario-oscuro);z-index:100;padding:8px 0 env(safe-area-inset-bottom,8px);}
   .mobile-nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 4px;background:none;border:none;color:rgba(255,255,255,.5);font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;cursor:pointer;}
-  .mobile-nav-btn.active{color:var(--verde-claro);}
+  .mobile-nav-btn.active{color:var(--primario-claro);}
   .mobile-nav-btn span{font-size:18px;}
   body{padding-bottom:68px;}
 }
@@ -448,7 +445,7 @@ tr.row-alerta{background:#ececee;border-left:3px solid var(--rojo);}
 /* Scanner tabs */
 .scan-tab-bar{display:flex;border-bottom:2px solid var(--borde);background:white;}
 .scan-tab{flex:1;padding:11px;border:none;background:transparent;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;color:var(--texto-suave);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s;}
-.scan-tab.active{color:var(--verde);border-bottom-color:var(--verde);}
+.scan-tab.active{color:var(--primario);border-bottom-color:var(--primario);}
 </style>
 </head>
 <body>
@@ -743,7 +740,7 @@ tr.row-alerta{background:#ececee;border-left:3px solid var(--rojo);}
       <div id="scannerView" style="position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:1;">
         <video id="scannerVideo" style="width:100%;height:100%;object-fit:cover;" playsinline muted></video>
         <div style="position:absolute;inset:0;border:2px solid rgba(192,57,43,.5);border-radius:12px;pointer-events:none;"></div>
-        <div style="position:absolute;left:15%;right:15%;top:0;height:2px;background:var(--verde-claro);opacity:.8;animation:scanAnim 2s linear infinite;"></div>
+        <div style="position:absolute;left:15%;right:15%;top:0;height:2px;background:var(--primario-claro);opacity:.8;animation:scanAnim 2s linear infinite;"></div>
       </div>
       <div id="scanStatus" style="margin:8px 0;font-size:12px;color:var(--texto-suave);text-align:center;">Iniciando cámara…</div>
       <div style="display:flex;gap:8px;margin-top:4px;">
@@ -851,7 +848,7 @@ tr.row-alerta{background:#ececee;border-left:3px solid var(--rojo);}
         <input type="file" id="evidenciaInput" accept="image/*" style="display:none;" onchange="previsualizarEvidencia(this)">
         <div id="evidenciaPreview" style="display:none;margin-top:8px;text-align:center;">
           <img id="evidenciaImg" style="max-height:150px;border-radius:10px;border:2px solid var(--borde);" alt="">
-          <div style="font-size:11px;color:var(--verde);margin-top:4px;">✅ Imagen cargada</div>
+          <div style="font-size:11px;color:var(--primario);margin-top:4px;">✅ Imagen cargada</div>
         </div>
       </div>
     </div>
@@ -945,9 +942,17 @@ tr.row-alerta{background:#ececee;border-left:3px solid var(--rojo);}
  *     match /justificaciones/{doc} {
  *       allow read, write: if request.auth != null;
  *     }
+ *     match /_sistema/{doc} {
+ *       // Solo usuarios autenticados pueden leer/escribir el doc de ping (sincronización de fecha)
+ *       allow read, write: if request.auth != null;
+ *     }
  *     match /usuarios/{uid} {
+ *       // Cada usuario solo puede leer su propio perfil
  *       allow read: if request.auth != null && request.auth.uid == uid;
- *       allow write: if request.auth != null;
+ *       // ⚠️ CRÍTICO: solo admins pueden crear/editar perfiles de usuario.
+ *       // Sin esto, un tutor podría cambiar su propio campo 'rol' a 'admin'.
+ *       allow write: if request.auth != null
+ *         && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin';
  *     }
  *   }
  * }
@@ -1020,10 +1025,6 @@ function _iniciarApp(fb) {
     fbStatus.innerHTML = '<div class="fb-dot" style="background:#8b1a1a"></div> Firebase Online';
   }
 }
-
-document.addEventListener('fbready', () => {
-  if (window._fb) _iniciarApp(window._fb);
-});
 
 // Timeout de seguridad: si Firebase no cargó en 10s, mostrar login con mensaje de error
 // (10s en lugar de 5s para dar tiempo a crearAdminInicial que hace operaciones de red)
@@ -1157,10 +1158,13 @@ function entrarApp() {
   const hints = { admin:'<strong>👑 Administrador</strong>Gestión completa del sistema.', tutor:'<strong>📖 Tutor</strong>Revisa tu aula y aprueba justificaciones.', padre:'<strong>👪 Apoderado</strong>Consulta la asistencia de tu hijo.' };
   document.getElementById('userHint').innerHTML = hints[sesion.rol] || '';
   actualizarFecha();
-  if (sesion.rol !== 'padre') { actualizarStats(); renderAlertasBadge(); }
-  if (sesion.rol === 'admin') irPanel('admin');
-  else if (sesion.rol === 'padre') irPanel('padre');
-  else irPanel('asistencia');
+  // Sincronizar fecha del servidor antes de cargar paneles (no bloquea la UI)
+  sincronizarFechaServidor().then(() => {
+    if (sesion.rol !== 'padre') { actualizarStats(); renderAlertasBadge(); }
+    if (sesion.rol === 'admin') irPanel('admin');
+    else if (sesion.rol === 'padre') irPanel('padre');
+    else irPanel('asistencia');
+  });
 }
 
 async function cerrarSesion() {
@@ -1202,7 +1206,26 @@ async function fsQuery(col, ...conditions) {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
-function getFecha() { return new Date().toLocaleDateString('es-PE'); }
+// Fecha del servidor — se sincroniza una vez al iniciar sesión.
+// Fallback al reloj local solo si Firestore no responde.
+let _fechaServidor = null;
+
+async function sincronizarFechaServidor() {
+  try {
+    // Usamos un doc temporal para leer el serverTimestamp de Firestore
+    const ref = FB.doc(FB.db, '_sistema', 'ping');
+    await FB.setDoc(ref, { ts: FB.serverTimestamp() }, { merge: true });
+    const snap = await FB.getDoc(ref);
+    const ts = snap.data()?.ts?.toDate();
+    if (ts) _fechaServidor = ts.toLocaleDateString('es-PE');
+  } catch(e) {
+    console.warn('No se pudo sincronizar fecha del servidor, usando fecha local:', e);
+  }
+}
+
+function getFecha() {
+  return _fechaServidor || new Date().toLocaleDateString('es-PE');
+}
 function actualizarFecha() {
   document.getElementById('topbarDate').textContent =
     new Date().toLocaleDateString('es-PE',{weekday:'short',year:'numeric',month:'short',day:'numeric'});
@@ -2089,7 +2112,7 @@ async function renderListaUsuarios() {
   c.innerHTML=usuarios.map(u=>`
     <div class="user-row">
       <div><div class="user-row-name">${u.nombre}</div><div class="user-row-sub">${u.email} · <span class="role-tag ${rolTag[u.rol]||''}">${rolLabel[u.rol]||u.rol}</span></div></div>
-      <div style="display:flex;gap:6px;">${u.id!==sesion?.uid?`<button class="btn btn-danger btn-sm" onclick="eliminarUsuario('${u.id}','${u.email}')">🗑</button>`:'<span style="font-size:11px;color:var(--verde);">(tú)</span>'}</div>
+      <div style="display:flex;gap:6px;">${u.id!==sesion?.uid?`<button class="btn btn-danger btn-sm" onclick="eliminarUsuario('${u.id}','${u.email}')">🗑</button>`:'<span style="font-size:11px;color:var(--primario);">(tú)</span>'}</div>
     </div>`).join('');
 }
 
@@ -2259,7 +2282,7 @@ async function procesarFotoQR(input) {
   const code=jsQR(imgData.data,imgData.width,imgData.height,{inversionAttempts:'attemptBoth'});
   const res=document.getElementById('photoResult');
   if(!code){res.innerHTML='<span style="color:var(--rojo)">❌ No se encontró QR en la imagen</span>';document.getElementById('photoStatus').textContent='';return;}
-  res.innerHTML='<span style="color:var(--verde)">✅ QR detectado</span>';
+  res.innerHTML='<span style="color:var(--primario)">✅ QR detectado</span>';
   document.getElementById('photoStatus').textContent='';
   const ok=await registrarAsistencia(code.data);
   if(ok){res.innerHTML='<span style="color:#8b1a1a">✅ Asistencia registrada</span>';setTimeout(()=>cerrarScanner(),1200);}
