@@ -5,32 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>AsistenciaQR — IE N.° 0162 SAN JOSÉ OBRERO - UGEL 05 - SJL</title>
 
-<!-- ══ CONTENT SECURITY POLICY ══ -->
-<!--
-  'unsafe-inline' en script-src y style-src es necesario porque la app usa:
-  - Scripts inline (lógica principal, manifest blob, botón instalar)
-  - Estilos inline en muchos elementos del HTML
-  - URL.createObjectURL (blob:) para reportes, boletas y manifest PWA
-  Si en el futuro se separa el JS a archivos externos, se puede eliminar 'unsafe-inline'.
--->
-<meta http-equiv="Content-Security-Policy" content="
-  default-src 'self';
-  script-src  'self' 'unsafe-inline' cdn.jsdelivr.net www.gstatic.com;
-  style-src   'self' 'unsafe-inline' fonts.googleapis.com;
-  font-src    fonts.gstatic.com;
-  connect-src 'self'
-              cdn.jsdelivr.net
-              www.gstatic.com
-              https://*.googleapis.com
-              https://*.firebaseio.com
-              https://*.firebasestorage.app
-              https://firebaseapp.com
-              https://*.a.run.app;
-  img-src     'self' data: blob:;
-  manifest-src 'self' blob:;
-  worker-src  'self' blob:;
-">
-
 <!-- ══ PWA META TAGS ══ -->
 <meta name="application-name" content="AsistenciaQR">
 <meta name="description" content="Sistema de control de asistencia IE N.° 0162 SAN JOSÉ OBRERO">
@@ -46,44 +20,8 @@
 <link rel="icon" type="image/jpeg" href="logo.jpeg">
 <link rel="apple-touch-icon" href="logo.jpeg">
 
-<!-- ══ PWA MANIFEST (inyectado vía Blob) ══ -->
-<script>
-(function() {
-  const manifest = {
-    name: "AsistenciaQR — IE N.° 0162 SAN JOSÉ OBRERO",
-    short_name: "AsistenciaQR",
-    description: "Control de asistencia IE N.° 0162 SAN JOSÉ OBRERO - UGEL 05 - SJL",
-    start_url: window.location.origin + window.location.pathname,
-    display: "standalone",
-    orientation: "portrait-primary",
-    background_color: "#6b1212",
-    theme_color: "#8b1a1a",
-    lang: "es",
-    icons: [
-      {
-        src: window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/') + "logo.jpeg",
-        sizes: "192x192",
-        type: "image/jpeg",
-        purpose: "any"
-      },
-      {
-        src: window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/') + "logo.jpeg",
-        sizes: "512x512",
-        type: "image/jpeg",
-        purpose: "any"
-      }
-    ],
-    categories: ["education", "productivity"],
-    screenshots: []
-  };
-  const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
-  const url  = URL.createObjectURL(blob);
-  const link = document.createElement('link');
-  link.rel   = 'manifest';
-  link.href  = url;
-  document.head.appendChild(link);
-})();
-</script>
+<!-- ══ PWA MANIFEST (archivo físico) ══ -->
+<link rel="manifest" href="./manifest.json">
 
 <!-- ══ SERVICE WORKER (caché offline) ══ -->
 <!-- ⚠️ IMPORTANTE: el Service Worker debe estar en un archivo físico separado (sw.js).
@@ -146,7 +84,7 @@ function instalarApp() {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously, signInWithCustomToken }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, doc, addDoc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp }
+import { getFirestore, collection, doc, addDoc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp, writeBatch }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ══════════════════════════════════════════════════════════════════
@@ -177,7 +115,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // Objeto interno — nunca se expone en window
-const _fbInterno = { auth, db, collection, doc, addDoc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously, signInWithCustomToken };
+const _fbInterno = { auth, db, collection, doc, addDoc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously, signInWithCustomToken, writeBatch };
 
 // Llamada directa desde el módulo ES — sin pasar por window._fb
 if (window._iniciarApp) window._iniciarApp(_fbInterno);
@@ -1289,11 +1227,25 @@ async function finalizarYMarcarAusentes() {
     const asist = await fsQuery('asistencia', FB.where('fecha','==',fecha));
     const conRegistro = new Set(asist.map(a=>a.estudianteId));
     const sinRegistro = todos.filter(e=>!conRegistro.has(e.id));
-    if(!sinRegistro.length){ notif('✅ Todos los estudiantes ya tienen registro hoy','success'); return; }
+    if (!sinRegistro.length) { notif('✅ Todos los estudiantes ya tienen registro hoy','success'); return; }
     const hora = new Date().toLocaleTimeString('es-PE');
-    for(const e of sinRegistro){
-      await fsAdd('asistencia',{estudianteId:e.id,nombre:e.nombre,grado:e.grado,seccion:e.seccion,fecha,hora,estado:'ausente',registradoPor:'auto-cierre'});
+
+    // Escritura por lotes (máx 500 por batch) — evita timeout con 900 alumnos
+    const LIMITE = 500;
+    for (let i = 0; i < sinRegistro.length; i += LIMITE) {
+      const lote = sinRegistro.slice(i, i + LIMITE);
+      const batch = FB.writeBatch(FB.db);
+      lote.forEach(e => {
+        const ref = FB.doc(FB.collection(FB.db, 'asistencia'));
+        batch.set(ref, {
+          estudianteId: e.id, nombre: e.nombre, grado: e.grado,
+          seccion: e.seccion, fecha, hora, estado: 'ausente',
+          registradoPor: 'auto-cierre', _ts: FB.serverTimestamp()
+        });
+      });
+      await batch.commit();
     }
+
     notif('✅ '+sinRegistro.length+' estudiante(s) marcados como ausentes','success');
     renderListaAsistencia(); cargarTablaAsistencia(); actualizarStats();
   } catch(err){ console.error(err); notif('❌ Error al marcar ausentes','error'); }
