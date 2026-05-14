@@ -2106,25 +2106,22 @@ async function guardarUsuario() {
   // Guardar credenciales del admin actual para reconectar después
   const adminEmail=sesion?.email;
   try {
-    // BUG #1 FIX: Firebase desloguea al admin al crear otro usuario.
-    // FIX-SEC-2: la contraseña ya viene del campo del modal, no de prompt().
     _ignorarAuthChange=true;
     const cred=await FB.createUserWithEmailAndPassword(FB.auth,email,pass);
-    await FB.setDoc(FB.doc(FB.db,'usuarios',cred.user.uid),{nombre,email,rol,grados,secciones,creadoEn:FB.serverTimestamp()});
-    // Reconectar al admin original inmediatamente
+    const nuevoUid=cred.user.uid;
+    await FB.setDoc(FB.doc(FB.db,'usuarios',nuevoUid),{nombre,email,rol,grados,secciones,creadoEn:FB.serverTimestamp()});
     await FB.signInWithEmailAndPassword(FB.auth,adminEmail,adminPass);
     _ignorarAuthChange=false;
     notif(`✅ Usuario "${nombre}" creado correctamente`,'success');
     cerrarModalUsuario(); renderListaUsuarios();
   } catch(e) {
     _ignorarAuthChange=false;
-    let msg='❌ Error al crear usuario';
+    let msg='❌ Error al crear usuario: '+e.message;
     if(e.code==='auth/email-already-in-use') msg='❌ Ese correo ya está registrado';
     else if(e.code==='auth/invalid-email') msg='❌ Correo inválido';
     else if(e.code==='auth/weak-password') msg='❌ La contraseña es demasiado débil (mín. 6 caracteres)';
-    else if(e.code==='auth/wrong-password'||e.code==='auth/invalid-credential') msg='❌ Tu contraseña de administrador es incorrecta. Recarga la página e inicia sesión nuevamente.';
+    else if(e.code==='auth/wrong-password'||e.code==='auth/invalid-credential') msg='❌ Tu contraseña de administrador es incorrecta';
     notif(msg,'error');
-    // Intentar reconectar al admin si algo falló después de createUser
     if(adminEmail&&adminPass){
       try{await FB.signInWithEmailAndPassword(FB.auth,adminEmail,adminPass);}catch(_){}
     }
