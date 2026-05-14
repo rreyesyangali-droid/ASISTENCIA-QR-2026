@@ -53,7 +53,7 @@
     name: "AsistenciaQR — IE N.° 0162 SAN JOSÉ OBRERO",
     short_name: "AsistenciaQR",
     description: "Control de asistencia IE N.° 0162 SAN JOSÉ OBRERO - UGEL 05 - SJL",
-    start_url: "./",
+    start_url: window.location.origin + window.location.pathname,
     display: "standalone",
     orientation: "portrait-primary",
     background_color: "#6b1212",
@@ -61,13 +61,13 @@
     lang: "es",
     icons: [
       {
-        src: "./logo.jpeg",
+        src: window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/') + "logo.jpeg",
         sizes: "192x192",
         type: "image/jpeg",
         purpose: "any"
       },
       {
-        src: "./logo.jpeg",
+        src: window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '/') + "logo.jpeg",
         sizes: "512x512",
         type: "image/jpeg",
         purpose: "any"
