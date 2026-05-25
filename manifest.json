@@ -1,0 +1,24 @@
+{
+  "name": "AsistenciaQR — IE N.° 0162 SAN JOSÉ OBRERO",
+  "short_name": "AsistenciaQR",
+  "description": "Sistema de control de asistencia IE N.° 0162 SAN JOSÉ OBRERO",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#8b1a1a",
+  "theme_color": "#8b1a1a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "logo.jpeg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "logo.jpeg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}
