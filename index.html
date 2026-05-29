@@ -71,6 +71,24 @@ function instalarApp() {
     if (btn) btn.style.display = 'none';
   });
 }
+
+// ══ iOS / Safari: mostrar banner de instalación manual ══
+(function() {
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isInStandaloneMode = ('standalone' in window.navigator) && window.navigator.standalone;
+  const dismissed = sessionStorage.getItem('iosBannerDismissed');
+  if (isIos && !isInStandaloneMode && !dismissed) {
+    window.addEventListener('DOMContentLoaded', () => {
+      const banner = document.getElementById('iosBanner');
+      if (banner) banner.style.display = 'flex';
+    });
+  }
+})();
+function cerrarBannerIos() {
+  sessionStorage.setItem('iosBannerDismissed', '1');
+  const b = document.getElementById('iosBanner');
+  if (b) b.style.display = 'none';
+}
 </script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 
@@ -136,6 +154,14 @@ if (window._iniciarApp) window._iniciarApp(_fbInterno);
 body{font-family:'DM Sans',sans-serif;background:var(--gris-bg);min-height:100vh;color:var(--texto);}
 
 /* ── SPLASH ── */
+/* ── iOS INSTALL BANNER ── */
+#iosBanner{display:none;position:fixed;bottom:0;left:0;right:0;z-index:99998;background:linear-gradient(135deg,#6b1212,#8b1a1a);color:white;padding:14px 16px 20px;flex-direction:column;gap:8px;box-shadow:0 -4px 20px rgba(0,0,0,.3);}
+.ios-banner-top{display:flex;align-items:center;justify-content:space-between;}
+.ios-banner-title{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px;}
+.ios-banner-close{background:rgba(255,255,255,.15);border:none;color:white;width:26px;height:26px;border-radius:50%;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.ios-banner-steps{font-size:12px;color:rgba(255,255,255,.85);line-height:1.7;background:rgba(0,0,0,.2);border-radius:10px;padding:10px 12px;}
+.ios-banner-steps b{color:white;}
+
 #splashScreen{position:fixed;inset:0;z-index:99999;background:linear-gradient(135deg,#5a1010,#6b1212,#8b1a1a);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;}
 .splash-icon{font-size:56px;animation:pulse 1.5s infinite;}
 .splash-txt{color:white;font-size:14px;opacity:.7;}
@@ -392,6 +418,20 @@ tr.row-alerta{background:#ececee;border-left:3px solid var(--rojo);}
 </style>
 </head>
 <body>
+
+<!-- ══ BANNER INSTALACIÓN iOS / Safari ══ -->
+<div id="iosBanner">
+  <div class="ios-banner-top">
+    <div class="ios-banner-title">📲 Instalar AsistenciaQR en iPhone</div>
+    <button class="ios-banner-close" onclick="cerrarBannerIos()">✕</button>
+  </div>
+  <div class="ios-banner-steps">
+    <b>Para instalar en iPhone / iPad:</b><br>
+    1️⃣ Toca el botón <b>Compartir ⬆️</b> en la barra inferior de Safari<br>
+    2️⃣ Elige <b>"Agregar a pantalla de inicio"</b><br>
+    3️⃣ Toca <b>Agregar</b> — aparecerá como ícono en tu pantalla
+  </div>
+</div>
 
 <!-- ══ SPLASH ══ -->
 <div id="splashScreen">
