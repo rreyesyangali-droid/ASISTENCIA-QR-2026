@@ -1688,7 +1688,12 @@ async function desmarcarAsistencia(estudianteId, nombre) {
 
 async function cargarTablaAsistencia() {
   const fecha = getFecha();
-  const asist = await fsQuery('asistencia', FB.where('fecha','==',fecha));
+  let asist = await fsQuery('asistencia', FB.where('fecha','==',fecha));
+  // Filtrar por grados/secciones asignadas al tutor
+  if (sesion?.rol !== 'admin') {
+    if (sesion?.grados?.length) asist = asist.filter(a => sesion.grados.includes(a.grado));
+    if (sesion?.secciones?.length) asist = asist.filter(a => sesion.secciones.includes(a.seccion));
+  }
   const tbody = document.getElementById('tablaAsistencia');
   if (!tbody) return;
   if (!asist.length) { tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--texto-suave);padding:18px;">Sin registros hoy</td></tr>'; return; }
@@ -1707,6 +1712,11 @@ async function buscarPorNombre() {
   if (q.length < 2) { c.innerHTML=''; return; }
   let lista = _estudiantesCache.length ? _estudiantesCache : await fsGetAll('estudiantes');
   lista = lista.filter(e=>e.nombre.toLowerCase().includes(q));
+  // Filtrar por grados/secciones del tutor
+  if (sesion?.rol !== 'admin') {
+    if (sesion?.grados?.length) lista = lista.filter(e => sesion.grados.includes(e.grado));
+    if (sesion?.secciones?.length) lista = lista.filter(e => sesion.secciones.includes(e.seccion));
+  }
   const fecha=getFecha();
   const asist=await fsQuery('asistencia',FB.where('fecha','==',fecha));
   const presSet=new Set(asist.filter(a=>a.estado!=='ausente').map(a=>a.estudianteId));
